@@ -18,15 +18,15 @@ It suits:
 
 ## What you can do with it
 
-- **Size a drone from a mission.** Choose a mission, a target flight time, an airframe (quad, hex, octo, VTOL quadplane, tiltrotor, fixed wing, or an FPV size class), a payload and a frame material. DroneCalc sizes the motors, props, battery and frame for that.
-- **See the physics, not just a number.** The results page shows estimated flight time, thrust-to-weight ratio, hover throttle and current draw, with charts that show how flight time changes with battery size and where the best pack size is. Plain-language "?" notes explain terms such as KV, S count, C rating and thrust-to-weight.
-- **Get real parts, with prices.** Each part category lists recommended parts from a catalog of about 150 items, with prices in your currency (17 currencies), links to stores for your region, and weight and price differences against the best pick.
-- **Check that parts fit together.** A compatibility list checks battery cell count against the ESC range, ESC current against motor current, connector types, flight-controller motor outputs and propeller size against the frame, and marks each check as pass, warn or fail.
-- **Check your weight against reality.** Enter the measured weight of your actual parts and DroneCalc recalculates flight time, thrust-to-weight and warnings for that weight instead of its estimate.
-- **Know which weight class you are in.** A badge shows the weight class for your region (EU, UK, India, US, or a generic fallback) with a reminder to check the local rules.
-- **Plan the build.** The wiring table lists the connectors and wire sizes to use, and a build and first-flight checklist covers steps such as checking polarity, setting up the failsafe and calibrating the compass.
-- **Keep and compare designs.** Save up to 20 builds in your browser, name them, and compare two or three side by side. Copy a link to share a build with someone else; the link contains the whole build.
-- **Export.** Download a PDF report or a CSV bill of materials, named after your drone (for example `Survey-01-Build.pdf` and `Survey-01-BOM.csv`).
+- **Size a drone from a mission.** Pick a mission, flight time, airframe and payload, and get the motors, props, battery and frame sized for it.
+- **See the physics.** Flight time, thrust-to-weight, hover throttle and current draw, with charts and plain-language notes.
+- **Get real parts, with prices.** Recommended parts from a catalog, priced in your currency, with store links.
+- **Check that parts fit together.** Pass, warn or fail checks on battery, ESC, motors, connectors and props.
+- **Use your real weight.** Enter the measured weight and the figures update.
+- **Know your weight class.** A badge for your region, with a reminder to check local rules.
+- **Plan the build.** A wiring table and a first-flight checklist.
+- **Save, compare and share.** Keep up to 20 builds in your browser, compare them, or copy a link.
+- **Export.** A PDF report or a CSV bill of materials.
 
 ## What you get out of it
 
@@ -45,14 +45,6 @@ Some mission and airframe combinations have no off-the-shelf part in the catalog
 ## Installation
 
 There is nothing to install system-wide. You download the files and serve them from a local web server.
-
-### What you need
-
-- **Git**, to clone the repo.
-- **Python 3**, to serve the files. Check with `python --version` (on some systems the command is `python3` or `py`).
-- A modern browser (current Chrome, Edge, Firefox or Safari).
-- Internet access is optional. It only loads the web fonts; without it the site falls back to system fonts.
-- **Node.js 18 or newer** is only needed to run the tests, not to run the site.
 
 ### Steps
 
@@ -90,10 +82,6 @@ There is nothing to install system-wide. You download the files and serve them f
    (`http://localhost:8000/` works too, but your saved builds are stored separately for each address, so pick one and keep using it.)
 
 4. **Stop the server** with `Ctrl+C` in the terminal when you are done. To use the site again later, repeat steps 2 and 3 from the same folder.
-
-### Why a server is needed
-
-Opening `index.html` by double-clicking it (a `file://` address) shows a blank page. The app is built from JavaScript modules, and browsers do not load modules from `file://`. Serving the folder over `http://` fixes this. Binding to `127.0.0.1` keeps the server reachable only from your own machine.
 
 ### Updating
 
