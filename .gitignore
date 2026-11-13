@@ -1,0 +1,9 @@
+# generated / tool caches
+.impeccable/
+tests/out/
+node_modules/
+# stray test-output captures at the repo root
+/catalog
+/engine
+/pdf
+/perf

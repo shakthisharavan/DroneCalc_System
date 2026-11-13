@@ -1,0 +1,157 @@
+/* Performance section (PERF). Extends the flight-manual sheet in main.css with its own tokens only:
+   chart paper (--sheet, the same surface main.css uses for inputs and figures), ink data, one rust build point,
+   hatched avoid zones, and the dark instrument readout (panel + amber numerals) for tooltips.
+   Columns follow the container, not the viewport: 1 below 700 px, 2 from 700, 3 from 1400. */
+.pf-sec{--pf-s:var(--sheet);--pf-mj:color-mix(in srgb,var(--ink) 15%,transparent);--pf-mn:color-mix(in srgb,var(--ink) 6%,transparent);container-type:inline-size}
+/* charts.js and perf.js write PAL hex as fill/stroke attributes and inline --c. These map them to the tone tokens, which equal PAL in light
+   and lift in dark (PAL blue is 2.6:1 on the dark sheet; --blue is 5.3:1). CSS beats presentation attributes; !important beats the inline --c. */
+.pf-sec [fill="#1f66ad"]{fill:var(--blue)} .pf-sec [fill="#14907c"]{fill:var(--teal)} .pf-sec [fill="#b07208"]{fill:var(--mustard)}
+.pf-sec [stroke="#1f66ad"]{stroke:var(--blue)} .pf-sec [stroke="#14907c"]{stroke:var(--teal)} .pf-sec [stroke="#b07208"]{stroke:var(--mustard)}
+.pf-sec [style*="#1f66ad"]{--c:var(--blue)!important} .pf-sec [style*="#14907c"]{--c:var(--teal)!important} .pf-sec [style*="#b07208"]{--c:var(--mustard)!important}
+.pf-lede,.pf-note{margin:0 0 18px;max-width:72ch;color:var(--ink-2);font-size:var(--t-body-s,15px)}
+/* columns: masonry-style, cards size to content */
+.pf-grid{column-gap:24px}
+.pf-grid>*{break-inside:avoid;margin-bottom:26px}
+@container (min-width:700px){.pf-grid{column-count:2}}
+@container (min-width:1400px){.pf-grid{column-count:3}}
+.pf-sr{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+
+/* figure frame */
+.pf{margin:0;min-width:0;display:flex;flex-direction:column}
+.pf-box{flex:1;display:flex;flex-direction:column;border:2px solid var(--ink);background:var(--pf-s)}
+.pf-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:7px 7px 7px 12px;border-bottom:1px solid var(--rule)}
+.pf-t{margin:0;display:flex;align-items:baseline;gap:10px;min-width:0;white-space:nowrap;font:700 var(--t-h3,19px)/1.1 var(--head);font-stretch:75%;text-transform:uppercase;letter-spacing:.05em}
+.pf-t em{flex:none;font:500 12px var(--mono);font-style:normal;letter-spacing:.1em;color:var(--accent)}
+.pf-tools{display:flex;gap:6px;flex:none;margin-left:auto}
+.pf-btn{min-height:32px;padding:0 10px;border:1.5px solid var(--ink);background:none;color:var(--ink);cursor:pointer;font:600 12px var(--mono);text-transform:uppercase;letter-spacing:.05em;transition:background .15s,color .15s}
+.pf-btn:hover,.pf-btn[aria-expanded="true"]{background:var(--ink);color:var(--paper)}
+.pf-btn:active{transform:translateY(1px)}
+.pf-btn[data-pf="csv"]{min-width:11ch}
+@media (pointer:coarse){.pf-btn{min-height:44px}}
+.pf figcaption{margin-top:8px;font:400 var(--t-small,14px)/1.5 var(--body);color:var(--ink-2)}
+.pf figcaption b{font-weight:500;color:var(--ink)}
+.pf-miss{justify-content:center;border:2px dashed var(--rule);padding:16px;font:400 var(--t-small,14px)/1.5 var(--body);color:var(--ink-2)}
+.pf-miss p{margin:0}.pf-miss em{font:500 12px var(--mono);font-style:normal;color:var(--accent);letter-spacing:.1em;margin-right:10px}
+
+/* legend keys (also reused by tooltips and the weight statement) */
+.pf-key{display:flex;flex-wrap:wrap;gap:3px 16px;margin:0;padding:9px 12px 0;list-style:none;font:400 var(--t-micro,12px)/1.45 var(--mono);color:var(--ink-2)}
+.pf-key li{display:inline-flex;align-items:center;gap:7px}
+:where(.pf-sec) :where(i[class^="k-"]){flex:none;display:inline-block;position:relative;width:18px;height:0;border-top:2px solid var(--ink)}
+.pf-sec .k-bd{border-top:1.5px solid var(--accent)}
+.pf-sec .k-bd::after{content:"";position:absolute;left:4px;top:-5.75px;width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.pf-sec .k-rf{border-top:1.5px dashed var(--ink-2)}
+.pf-sec .k-hz,.pf-sec .k-hr{width:14px;height:11px;border:1px solid currentColor;background:repeating-linear-gradient(45deg,var(--bad) 0 1px,transparent 1px 4px)}
+.pf-sec .k-hz{color:color-mix(in srgb,var(--bad) 50%,transparent)}
+.pf-sec .k-hr{color:var(--rule);background:repeating-linear-gradient(135deg,var(--ink-2) 0 1px,transparent 1px 4px)}
+.pf-sec .k-sw{width:12px;height:12px;border:0;border-radius:3px;background:var(--c)}
+.pf-sec .k-sw.st{background:repeating-linear-gradient(45deg,var(--c) 0 2px,transparent 2px 4px);box-shadow:inset 0 0 0 1.5px var(--c)}
+.pf-sec .k-lm{border-top:1.5px dashed var(--bad)}
+
+/* plot: drawn 1:1 in css px by bindPerformance; main.css figure-svg chrome is switched off */
+.pf-plot{position:relative;padding-top:2px}
+.pf-sec figure svg{border:0;background:none}
+.pf-sec .pf-svg{display:block;width:100%;height:auto;overflow:visible;touch-action:pan-y;cursor:crosshair}
+.pf-svg:focus{outline:none}
+.pf-svg:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.pf-sec svg text{font:400 11px var(--mono);fill:var(--ink-2);font-variant-numeric:tabular-nums}
+.pf-svg .mn{stroke:var(--pf-mn);stroke-width:1}
+.pf-svg .mj{stroke:var(--pf-mj);stroke-width:1}
+.pf-svg .fr{fill:none;stroke:var(--ink);stroke-width:1}
+.pf-svg .cv{fill:none;stroke:var(--ink);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.pf-svg .cv.dsh{stroke-width:1.5;stroke-dasharray:5 4}
+.pf-sec .bd{stroke:var(--accent);stroke-width:1.5}
+.pf-svg .rf{stroke:var(--ink-2);stroke-width:1;stroke-dasharray:4 3}
+.pf-svg .lm{stroke:var(--bad);stroke-width:1.25;stroke-dasharray:6 3}
+.pf-sec .ld{stroke:var(--ink-2);stroke-width:.75}
+.pf-svg .db{fill:var(--accent);stroke:var(--pf-s);stroke-width:2}
+.pf-svg .dr{fill:var(--ink);stroke:var(--pf-s);stroke-width:2}
+.pf-svg .zw{fill:var(--bad);opacity:.05}
+.pf-svg .hz{stroke:var(--bad);stroke-width:1;opacity:.5}
+.pf-svg .hr{stroke:var(--ink);stroke-width:1;opacity:.4}
+.pf-sec .h{paint-order:stroke;stroke:var(--pf-s);stroke-width:4px;stroke-linejoin:round}
+.pf-svg .pl{font:600 13px var(--head);font-stretch:75%;letter-spacing:.08em;fill:var(--ink)}
+.pf-sec .u{font:400 10.5px var(--mono);letter-spacing:0;fill:var(--ink-2)}
+.pf-sec .fl{font:500 10.5px var(--mono);letter-spacing:.03em;fill:var(--ink-2)}
+.pf-svg .fl.b{font-weight:600;fill:var(--accent)}
+.pf-svg .fl.lim{font-weight:600;fill:var(--bad)}
+.pf-svg .vb{font-weight:600;fill:var(--accent)}
+.pf-svg .zl{font:600 10.5px var(--mono);letter-spacing:.06em;fill:var(--bad)}
+.pf-svg .rl{font-size:10.5px}
+.pf-svg .rl.lim{fill:var(--bad);font-weight:600}
+.pf-svg .el{font-size:10.5px;font-weight:500;fill:var(--ink)}
+.pf-svg .xt{font:500 10.5px var(--mono);letter-spacing:.08em;fill:var(--ink)}
+.pf-svg .xhl{stroke:var(--ink);stroke-width:1}
+.pf-svg .xhd{fill:var(--pf-s);stroke:var(--ink);stroke-width:2}
+.pf-svg .xb rect{fill:var(--panel)}
+.pf-svg .xb text{font:500 11px var(--mono);fill:var(--amber)}
+/* segment figures: profile washes + strip, weight bar */
+.pf-svg .pw{fill-opacity:.14;transition:fill-opacity .15s}
+.pf-svg .pw.rs{fill-opacity:1}
+.pf-svg .pw.on{fill-opacity:.3}
+.pf-svg .pb,.pf-svg .sg{transition:opacity .15s}
+.pf-svg .pb.rs{stroke:var(--ink-2);stroke-width:.75}
+.pf-svg .pw.st{fill-opacity:.34}
+.pf-svg .pw.st.on{fill-opacity:.55}
+.pf-svg .pb.st{stroke-width:1}
+.pf-svg .pb.on,.pf-svg .sg.on{stroke:var(--ink);stroke-width:2}
+.pf-svg .phl{font:600 12.5px var(--head);font-stretch:75%;letter-spacing:.08em;fill:var(--ink)}
+.pf-svg .phv{font-size:10.5px;fill:var(--ink-2)}
+.pf-svg .sl{font:600 10.5px var(--mono);letter-spacing:.03em;fill:var(--on-accent);pointer-events:none}
+.pf-sec .br,.pf-svg .tm{fill:none;stroke:var(--ink);stroke-width:1}
+
+/* tooltip: the instrument readout */
+.pf-tip{position:absolute;left:0;top:0;z-index:4;pointer-events:none;min-width:150px;max-width:240px;padding:8px 11px 9px;background:var(--panel);color:var(--panel-ink);box-shadow:0 10px 24px -10px rgba(20,24,28,.6);font:400 11.5px/1.35 var(--mono);opacity:0;transform:translateY(3px);transition:opacity .14s cubic-bezier(.2,.7,.2,1),transform .14s cubic-bezier(.2,.7,.2,1)}
+.pf-tip.on{opacity:1;transform:none}
+.pf-tip b{display:flex;align-items:center;gap:7px;padding-bottom:6px;margin-bottom:5px;border-bottom:1px solid var(--panel-line);font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--panel-ink)}
+.pf-tip .r{display:grid;grid-template-columns:minmax(6ch,auto) 1fr;align-items:baseline;gap:0 9px;padding:1.5px 0}
+.pf-tip em{font:500 14px var(--mono);font-style:normal;color:var(--amber);font-variant-numeric:tabular-nums;text-align:right}
+.pf-tip .r span{color:var(--panel-dim)}
+
+/* table view */
+.pf-tbl{border-top:1px solid var(--rule);padding:8px 12px 12px}
+.pf-tw{overflow-x:auto}
+.pf-tbl table{width:100%;border-collapse:collapse;font:400 var(--t-micro,12px)/1.35 var(--mono);font-variant-numeric:tabular-nums}
+.pf-tbl th,.pf-tbl td{padding:5px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--pf-mj)}
+.pf-tbl thead th{vertical-align:bottom;white-space:normal;border-bottom:1.5px solid var(--ink);font:600 10.5px/1.3 var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}
+.pf-tbl tbody th{font-weight:500}
+.pf-tbl tr.hi th,.pf-tbl tr.hi td{background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--accent);font-weight:600}
+.pf-tbl ::selection,.pf figcaption::selection{background:var(--ink);color:var(--paper)}
+
+/* weight statement list under the bar */
+.pf-ws{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0 22px;margin:0;padding:2px 12px 12px;list-style:none;font:400 12.5px var(--mono)}
+.pf-ws li{display:grid;grid-template-columns:12px minmax(0,1fr) auto 3.6em;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--pf-mj)}
+.pf-ws b{font-weight:500;text-align:right;font-variant-numeric:tabular-nums}
+.pf-ws small{font-size:12px;text-align:right;color:var(--ink-2);font-variant-numeric:tabular-nums}
+
+/* key figures: VTOL, tiltrotor, fixed wing */
+.pf-vt{margin:0 0 26px;border:2px solid var(--ink);background:var(--pf-s)}
+.pf-vt>.pf-t{padding:9px 12px;border-bottom:1px solid var(--rule)}
+.pf-vt-in{display:grid;grid-template-columns:minmax(0,1fr)}
+@container (min-width:700px){.pf-vt-in{grid-template-columns:minmax(240px,300px) minmax(0,1fr)}.pf-ga{border-bottom:0!important;border-right:1px solid var(--rule)}}
+.pf-ga{margin:0;padding:12px 14px 10px;border-bottom:1px solid var(--rule)}
+.pf-ga svg{display:block;width:100%;max-width:300px;height:auto;margin:0 auto}
+.pf-ga figcaption{margin-top:6px;font:400 var(--t-caption,13px)/1.45 var(--body);color:var(--ink-2)}
+.pf-ga .wg,.pf-ga .fs{fill:color-mix(in srgb,var(--ink) 7%,transparent);stroke:var(--ink);stroke-width:1.25}
+.pf-ga .bm{stroke:var(--ink);stroke-width:1.75}
+.pf-ga .fn{stroke:var(--ink);stroke-width:2.5;stroke-linecap:round}
+.pf-ga .ax{stroke:var(--accent);stroke-width:1;stroke-dasharray:6 2 1.5 2}
+.pf-ga .rt{fill:none;stroke:var(--ink-2);stroke-width:1;stroke-dasharray:7 2 1.5 2}
+.pf-ga .hb{fill:var(--ink)}
+.pf-ga .pu{stroke:var(--accent);stroke-width:2.5;stroke-linecap:round}
+.pf-ga .dim,.pf-ga .ext{fill:none;stroke:var(--ink);stroke-width:.75}
+.pf-kf{display:flex;flex-wrap:wrap;margin:0;overflow:hidden;align-content:stretch}
+.pf-kf>div{flex:1 1 150px;padding:12px 14px 13px;margin:0 -1px -1px 0;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.pf-kf dt{font:400 var(--t-label,13px) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label,.05em);color:var(--ink-2)}
+.pf-kf dd{margin:3px 0 0;font:500 var(--t-data-lg,26px)/1.1 var(--mono);font-variant-numeric:tabular-nums}
+.pf-kf dd small{margin-left:4px;font-size:13px;color:var(--ink-2)}
+.pf-kf dd.s{margin-top:5px;font:400 var(--t-caption,13px)/1.4 var(--body);color:var(--ink-2)}
+/* The full-width hover bar goes last, so the short cells pack into full rows above it. */
+.pf-kf .hv{flex-basis:100%;order:1}
+.pf-hb{display:flex;gap:2px;height:8px;margin-top:9px}
+.pf-hb i{min-width:4px;border-radius:4px;background:var(--c)}
+
+@media print{
+  .pf-tools,.pf-tip,.pf-lede,.xh{display:none!important}
+  .pf-box,.pf-vt,.pf{break-inside:avoid}
+  .pf-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}

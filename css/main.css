@@ -1,0 +1,619 @@
+/* TYPE (v3): Archivo at 75% width for headings: a grotesque with DIN-like placard caps, one variable file, sturdier than Barlow at 12-14px.
+   Atkinson Hyperlegible Next for body: drawn so 0/O, 1/l/I and 3/8 never collide, which matters in part names like MN3508 KV380. JetBrains Mono for data: fixed-pitch,
+   so every figure is tabular, with a large x-height that stays legible in 12px captions and the dark panel. Scale lives in --t-* below.
+   DIRECTION: aircraft flight-manual spec sheet. Warm survey paper, ink rules, condensed placard caps. Right rail is a dark instrument panel
+   with amber phosphor numerals; one orange accent on paper. Data first: ruled tables, tick-marked gauges, inline-SVG plots drawn like manual
+   figures. No card grid, no gradients. On results the panel becomes the BOM dock; a selected part inverts to ink, like a ticked box on a form. */
+/* Metric fallbacks: local faces scaled to the web fonts' widths so the swap does not reflow lines (widths measured in Chrome: 0.96, 0.98, 1.09). */
+@font-face{font-family:"Archivo Fallback";src:local("Arial Narrow"),local("ArialNarrow");size-adjust:96%;ascent-override:90%;descent-override:22%;line-gap-override:0%}
+@font-face{font-family:"Atkinson Fallback";src:local("Arial"),local("ArialMT"),local("Helvetica");size-adjust:98%;ascent-override:96%;descent-override:25%;line-gap-override:0%}
+@font-face{font-family:"JetBrains Mono Fallback";src:local("Consolas");size-adjust:109%;ascent-override:94%;descent-override:26%;line-gap-override:0%}
+/* THEME (v4): every tone token is light-dark(light, dark), picked by color-scheme. No data-theme follows the OS; app.js pins data-theme=light|dark
+   from the header toggle. One set of values, so the toggle and prefers-color-scheme can never drift apart. Dark = graphite sheet, light rules;
+   inverted surfaces (section bands, selected cards) lift to a lighter graphite instead of flipping to cream, so amber and the -lite tints stay legible.
+   Dark contrast, measured on --paper/--sheet: ink 12.8/11.7, ink-2 7.4/6.8, accent 6.5/6.0, -ink tones >= 7.7; series fills >= 5.0 (graphics). */
+:root{color-scheme:light dark}
+:root[data-theme=light]{color-scheme:light}
+:root[data-theme=dark]{color-scheme:dark}
+:root{
+  --paper:light-dark(#e9e4d4,#1c2024); --paper-2:light-dark(#dfd9c6,#262b30); --sheet:light-dark(#f3efe2,#22272c);
+  --ink:light-dark(#14181c,#e8e3d3); --ink-2:light-dark(#3c434a,#b3ae9e); --rule:light-dark(rgba(20,24,28,.28),rgba(232,227,211,.26));
+  --accent:light-dark(#b53a08,#f0875c); --ok:light-dark(#2b6a3d,#7fd39a); --bad:light-dark(#a3231a,#ff8a70);
+  /* Text on --accent fills, and on --amber fills (amber is the same in both themes, so its text stays dark). */
+  --on-accent:light-dark(#fff,#14181c); --on-amber:#14181c;
+  /* Inverted surface: section bands, table heads, checked choices, selected parts. Ink in light; a raised graphite in dark. */
+  --inv:light-dark(#14181c,#353c43); --inv-ink:light-dark(#e9e4d4,#f3efe2);
+  /* Category and series accents. Fill = graphics (3:1 on sheet); -ink = text on paper (>= 4.5:1); -lite = text on the dark panel. Light --blue, --mustard, --teal match charts.js PAL; perf.css remaps PAL attributes to these. */
+  --blue:light-dark(#1f66ad,#5d9de2); --blue-ink:light-dark(#1a4f86,#8fbdf0); --teal:light-dark(#14907c,#2db59c); --teal-ink:light-dark(#0b6557,#6fd0bd); --teal-lite:#6fd0bd;
+  --mustard:light-dark(#b07208,#d39a2c); --mustard-ink:light-dark(#6e4700,#eec064); --mustard-lite:#f0c060; --slate:light-dark(#5d7286,#8398ac); --slate-ink:light-dark(#3b4e5e,#aabdcd); --slate-lite:#9fb3c4;
+  /* The instrument panel is dark in both themes; only its edge shows in dark, where the sheet is dark too. */
+  --panel:#14181c; --panel-2:#1d2328; --panel-line:#3a4249; --amber:#ffb000; --panel-ink:#d8d4c4; --panel-dim:#a9a692; --ink-on:light-dark(#bdb8a6,#c9c4b3);
+  --panel-edge:light-dark(transparent,#3a4249); --ok-lite:#7fd39a; --bad-lite:#ff8a70;
+  /* Families. Names kept from v2: perf.css and charts read --head and --mono. */
+  --head:"Archivo","Archivo Fallback","Arial Narrow",sans-serif; --body:"Atkinson Hyperlegible Next","Atkinson Fallback",Arial,sans-serif; --mono:"JetBrains Mono","JetBrains Mono Fallback",ui-monospace,Consolas,monospace;
+  /* Type scale (16px root). Headings: display > h1 > h2 > h3. Text: body > small > caption > micro. Figures: data-lg > data > data-s. */
+  --t-display:clamp(2.125rem,1.35rem + 3.1vw,3.25rem); --t-h1:clamp(1.375rem,1.05rem + 1.3vw,1.875rem); --t-h2:1.375rem; --t-h3:1.125rem;
+  --t-body:1.0625rem; --t-body-s:1rem; --t-small:.875rem; --t-caption:.8125rem; --t-micro:.75rem;
+  /* Small uppercase labels (readout, KPI, BOM heads): one step above micro with light tracking, so the caps stay legible on paper and the dark panel. */
+  --t-label:.8125rem; --tr-label:.05em;
+  --t-data-lg:1.75rem; --t-data:1.375rem; --t-data-s:1.125rem;
+  --pad:clamp(16px,3vw,40px); --max:2200px;
+  --ext:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 8.5 8.5 1.5M3.5 1.5h5v5' fill='none' stroke='%23000' stroke-width='1.8'/%3E%3C/svg%3E");
+}
+*{box-sizing:border-box}
+html{background:var(--paper);color:var(--ink);font:400 100%/1.5 var(--body);-webkit-text-size-adjust:100%;scrollbar-color:var(--ink-2) var(--paper-2);scroll-behavior:smooth}
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;font-size:var(--t-body)}
+p,li{text-wrap:pretty}
+/* Every figure in the UI lines up in columns, whatever face sets it. */
+.ro dd,.kpi dd,.pr,.bomt,.tot b,.d-tot b,.d-list b,.dock-sum,.inp input,.ticks,.fpv-s dd,.verdict{font-variant-numeric:tabular-nums}
+h1,h2,h3,h4,h5{font-family:var(--head);font-stretch:75%;text-transform:uppercase;letter-spacing:.03em;margin:0;line-height:1.05;text-wrap:balance}
+button,input,select{font:inherit;color:inherit}
+input,select{caret-color:var(--accent)}
+a{text-underline-offset:3px}
+::selection{background:var(--amber);color:var(--on-amber)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.skip{position:absolute;left:-999px;top:0;background:var(--ink);color:var(--paper);padding:8px 12px;z-index:9}
+.skip:focus{left:8px;top:8px}
+.sr,.live{position:absolute;left:-999px;width:1px;height:1px;overflow:hidden}
+
+/* Sheet edges: masthead, shell and footer share one content edge, capped at --max on wide screens. */
+.mast,.foot{padding-inline:max(var(--pad),calc((100% - var(--max)) / 2 + var(--pad)))}
+.mast{display:flex;justify-content:space-between;align-items:baseline;gap:6px 24px;flex-wrap:wrap;padding-block:14px;border-bottom:3px solid var(--ink)}
+.mast-id{display:flex;align-items:center;gap:12px;min-width:0}
+.mast-mark{width:22px;height:22px;border:3px solid var(--ink);border-radius:50%;position:relative;flex:none}
+.mast-mark::before,.mast-mark::after{content:"";position:absolute;background:var(--accent)}
+.mast-mark::before{left:50%;top:-8px;bottom:-8px;width:3px;margin-left:-1.5px}
+.mast-mark::after{top:50%;left:-8px;right:-8px;height:3px;margin-top:-1.5px}
+.mast h1{font-size:var(--t-h1);font-weight:700}
+.mast-sub{margin:0;font:400 var(--t-label) var(--mono);color:var(--ink-2);text-transform:uppercase;letter-spacing:var(--tr-label)}
+
+.shell{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;align-items:start;width:100%;max-width:var(--max);margin-inline:auto}
+.shell.wide{grid-template-columns:minmax(0,1fr)}
+.shell.wide .panel{display:none}
+.stage{padding:var(--pad);outline:none;min-width:0}
+/* Readout sticks in view while the form scrolls; the dark column is drawn by .shell::after so the panel itself can stay short. */
+.shell{position:relative;isolation:isolate}
+.shell::after{content:"";position:absolute;top:0;bottom:0;right:0;width:340px;background:var(--panel);box-shadow:inset 1px 0 var(--panel-edge);z-index:-1}
+.shell.wide::after{display:none}
+.panel{position:sticky;top:0;align-self:start;max-height:100vh;max-height:100dvh;overflow-y:auto;scrollbar-color:#59616a var(--panel);background:var(--panel);box-shadow:inset 1px 0 var(--panel-edge);color:var(--panel-ink);padding:24px 22px}
+
+.rail{display:flex;margin:0 0 32px;padding:0;list-style:none;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink)}
+.rail li{flex:1}
+.rail button{width:100%;display:flex;gap:8px;align-items:baseline;padding:10px 8px;background:none;border:0;border-right:1px solid var(--rule);cursor:pointer;text-align:left;min-height:44px}
+.rail li:last-child button{border-right:0}
+.rail b{font:500 var(--t-micro) var(--mono)}
+.rail span{font:600 var(--t-small) var(--head);text-transform:uppercase;letter-spacing:.06em}
+.rail button[aria-current="step"]{background:var(--inv);color:var(--inv-ink)}
+.rail button:disabled{opacity:.4;cursor:not-allowed}
+.rail button:not(:disabled):not([aria-current]):hover{background:var(--paper-2)}
+
+.phase{max-width:1120px}
+.phase h2,.res-head h2{font-size:var(--t-display);font-weight:700;outline:none}
+.lede{color:var(--ink-2);margin:12px 0 28px;max-width:60ch}
+
+.choices{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));border:2px solid var(--ink);margin:0;padding:0;min-width:0}
+.choice{position:relative;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);margin:0 -1px -1px 0}
+.choice input{position:absolute;opacity:0;inset:0;cursor:pointer;margin:0;width:100%;height:100%}
+.choice label{display:block;padding:14px 16px 16px;cursor:pointer;height:100%;min-height:92px;transition:background .15s,color .15s}
+.choice input:not(:checked):hover+label{background:var(--paper-2)}
+.choice .nm{font:700 var(--t-h2) var(--head);text-transform:uppercase;letter-spacing:.04em;display:flex;justify-content:space-between;gap:8px}
+.choice .nm>span{min-width:0;hyphens:auto}
+.choice .nm::after{content:"";width:14px;height:14px;border:2px solid currentColor;border-radius:50%;flex:none;margin-top:5px}
+.choice small{display:block;font-size:var(--t-small);color:var(--ink-2);margin-top:4px}
+.choice input:checked+label{background:var(--inv);color:var(--inv-ink)}
+.choice input:checked+label small{color:var(--ink-on)}
+.choice input:checked+label .nm::after{background:var(--amber);border-color:var(--amber)}
+.choice input:focus-visible+label{outline:3px solid var(--accent);outline-offset:-3px}
+.choice input:checked:focus-visible+label{outline-color:var(--amber)}
+/* Configuration cards: top-view schematic, rotor discs in the accent. */
+.cfg>legend{margin-bottom:8px}
+/* Cards keep one width so a one-card family hugs its card instead of drawing empty ruled cells. */
+.cfgs{display:flex;flex-wrap:wrap;width:fit-content;max-width:100%}
+.cfgs .choice{flex:0 0 220px}
+@media (max-width:600px){.cfgs{width:auto}.cfgs .choice{flex:1 1 100%}}
+.cfgs svg{display:block;width:48px;height:48px;margin-bottom:8px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.cfgs svg .rot{stroke:var(--accent)}
+.cfgs input:checked+label svg .rot{stroke:var(--amber)}
+.cfgs .nm{font-size:var(--t-h2)}
+.cfgs small{font-size:var(--t-caption);line-height:1.4}
+.cfgs svg .ax{stroke:var(--ink-2);stroke-width:1;stroke-dasharray:2 2}
+.cfgs input:checked+label svg .ax{stroke:var(--ink-on)}
+/* Families stack as ruled sub-forms; each carries its fit with the chosen mission. Advisory, never disabled. */
+.fams{display:grid;gap:22px}
+.fam-h{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:flex-start;gap:4px 12px;margin:0 0 8px}
+.fam-t{font:700 var(--t-h3) var(--head);font-stretch:75%;text-transform:uppercase;letter-spacing:.06em}
+.fit{font:600 var(--t-micro) var(--mono);text-transform:uppercase;letter-spacing:.08em;padding:2px 8px;border:1px solid currentColor;white-space:nowrap}
+.fit.good{color:var(--ok)} .fit.ok{color:var(--ink-2)} .fit.poor{color:var(--bad)}
+/* Card fit: a short word, then the reason for this mission. Checked cards use the lighter tints so the text stays >= 4.5:1 on ink. */
+.cfgs .fit{display:inline-block;margin-top:10px}
+.cfgs .why{display:block;margin-top:6px;font-size:var(--t-caption);line-height:1.4;color:var(--ink)}
+.cfgs input:checked+label .fit.good{color:var(--ok-lite)} .cfgs input:checked+label .fit.poor{color:var(--bad-lite)} .cfgs input:checked+label .fit.ok{color:var(--ink-on)}
+.cfgs input:checked+label .why{color:var(--inv-ink)}
+.cfg-warn{list-style:none;margin:14px 0 0;padding:0}
+.cfg-warn:empty{display:none}
+.mat-warn{grid-column:1/-1;margin:0}
+.cfg-warn li{padding:10px 14px;border:2px solid var(--bad);background:color-mix(in srgb,var(--bad) 12%,var(--sheet));margin-top:6px;font-size:var(--t-small)}
+.cfg-warn li::before{content:"CAUTION ";font:600 var(--t-micro) var(--mono);letter-spacing:.1em;color:var(--bad)}
+/* FPV size cards: the size is the headline, then the two numbers that differ between classes. */
+.fpv .hint{margin-bottom:6px}
+.fpvs{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+.fpvs .nm{font-size:var(--t-display);line-height:1}
+.fpvs .nm em{display:block;margin-top:6px;font:600 var(--t-small) var(--head);font-stretch:75%;font-style:normal;letter-spacing:.08em;color:var(--accent)}
+.fpvs input:checked+label .nm em{color:var(--amber)}
+.fpv-s{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;margin:14px 0 10px;padding-top:10px;border-top:1px dashed var(--rule)}
+.fpv-s dt{font:400 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label);color:var(--ink-2)}
+.fpv-s dd{margin:2px 0 0;font:500 var(--t-data-s) var(--mono)}
+.fpv-s dd small{display:block;margin:0;font-size:var(--t-micro);color:var(--ink-2)}
+.fpvs input:checked+label :is(.fpv-s dt,.fpv-s dd small){color:var(--ink-on)}
+.fpvs input:checked+label .fpv-s{border-top-color:var(--panel-line)}
+
+/* Details step: grouped like a form, each group under a ruled heading. */
+.grp{border:0;margin:0 0 36px;padding:0;min-width:0}
+/* Group headings share the section-box style: ink square, paper title, rust edge along the foot. */
+.grp>legend{width:100%;padding:9px 14px 6px;margin-bottom:20px;background:var(--inv);color:var(--inv-ink);border-bottom:4px solid var(--accent);font:700 var(--t-h2) var(--head);text-transform:uppercase;letter-spacing:.06em}
+/* Environment: a compact sub-group under the same form, with a plain subordinate heading (no box). */
+.grp.env>legend{padding:0 0 6px;margin-bottom:14px;background:none;color:var(--ink-2);box-shadow:none;border-bottom:1px solid var(--rule);font:600 var(--t-body) var(--head);letter-spacing:.06em}
+.grp .cfg{margin-bottom:24px}
+.mat-notes{margin:12px 0 0;padding:0;list-style:none;font-size:var(--t-caption);line-height:1.45}
+.mat-notes li{padding:6px 0;border-top:1px dashed var(--rule)}
+.mat-notes b{font-family:var(--head);font-stretch:75%;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.mat-notes small{display:block;font:400 var(--t-micro) var(--mono);color:var(--ink-2)}
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:22px 28px;align-items:start}
+.t-fields{max-width:760px}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0;border:0;padding:0;margin:0}
+.field>label,.field>legend{font:600 var(--t-small) var(--head);text-transform:uppercase;letter-spacing:.1em;padding:0}
+.field .hint{font-size:var(--t-caption);color:var(--ink-2)}
+.field.full{grid-column:1/-1}
+.inp{display:flex;border:2px solid var(--ink);background:var(--sheet)}
+.inp input,.inp select{flex:1;min-width:0;border:0;background:none;padding:10px 12px;font:500 var(--t-data-s) var(--mono);min-height:44px}
+.inp select{cursor:pointer;font:500 var(--t-body) var(--body)}
+.inp .u{display:flex;align-items:center;padding:0 14px;font:400 var(--t-caption) var(--mono);background:var(--paper-2)}
+.inp:focus-within{outline:3px solid var(--accent);outline-offset:2px}
+.inp input:focus-visible,.inp select:focus-visible{outline:none}
+input[type=range]{width:100%;accent-color:var(--accent);height:32px;margin:0}
+.ticks{display:flex;justify-content:space-between;font:400 var(--t-micro) var(--mono);color:var(--ink-2)}
+.field .err{font:500 var(--t-caption) var(--mono);color:var(--bad)}
+.field .err:empty{display:none}
+.field.bad .inp{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 8%,var(--sheet))}
+
+.nav{display:flex;gap:12px;flex-wrap:wrap;margin-top:32px;padding-top:18px;border-top:2px solid var(--ink)}
+.nav .btn.pri{margin-left:auto}
+.btn{font:700 var(--t-h3) var(--head);text-transform:uppercase;letter-spacing:.08em;padding:12px 22px;border:2px solid var(--ink);background:none;cursor:pointer;min-height:48px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;transition:background .15s,color .15s,border-color .15s,transform .1s}
+.btn:hover{background:var(--ink);color:var(--paper)}
+.btn:active{transform:translateY(1px)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.pri:hover{background:var(--ink);border-color:var(--ink)}
+.btn.sm{font-size:var(--t-small);padding:6px 12px;min-height:44px}
+.btn:disabled{opacity:.4;cursor:not-allowed;background:none;color:inherit}
+.btn.pri:disabled{background:var(--accent);color:var(--on-accent)}
+.btn:disabled:hover{background:none;color:inherit}
+.btn.pri:disabled:hover{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+a.btn,a.btn:visited{color:var(--ink)}
+a.btn.buy{border-color:var(--ink);background:transparent}
+a.btn.buy::after{content:"";flex:none;width:9px;height:9px;margin-left:7px;background:var(--accent);-webkit-mask:var(--ext) center/contain no-repeat;mask:var(--ext) center/contain no-repeat}
+a.btn.buy:hover,a.btn.buy:focus-visible{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+a.btn.buy:hover::after,a.btn.buy:focus-visible::after{background:var(--on-accent)}
+.rwarns .lnk{background:none;border:0;padding:0;margin-left:8px;font:600 var(--t-small) var(--mono);color:var(--accent);text-decoration:underline;cursor:pointer;min-height:44px}
+
+/* Live readout (instrument panel) */
+.panel h2{font-size:var(--t-small);letter-spacing:.16em;color:var(--amber);padding-bottom:10px;border-bottom:1px solid var(--panel-line);margin-bottom:6px}
+.panel h2 small{display:block;margin-top:4px;font:400 var(--t-label) var(--mono);letter-spacing:var(--tr-label);color:var(--panel-dim)}
+.ro{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:9px 0;border-bottom:1px dashed #34393f}
+.ro dt{font:400 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label);color:var(--panel-dim)}
+.ro dd{margin:0;font:500 var(--t-data) var(--mono);color:var(--amber);text-align:right;min-width:0}
+.ro dd small{font-size:var(--t-micro);color:var(--panel-dim)}
+dl.rows{margin:0}
+.gauge{margin:18px 0 4px}
+.gauge .lbl{display:flex;justify-content:space-between;gap:8px;font:400 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label);color:var(--panel-dim);margin-bottom:6px}
+.gauge .bar{height:14px;position:relative;overflow:visible;border:1px solid var(--panel-line);background:var(--panel-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='14'%3E%3Cpath d='M19.5 0v14' stroke='%233a4249'/%3E%3C/svg%3E") repeat-x}
+.gauge .fill{position:absolute;inset:0 auto 0 0;background:var(--amber);transition:width .25s}
+.gauge .mark{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--panel-ink)}
+.gauge.bad .fill{background:#ff6a4d}
+.gauge.good .fill{background:#6bd68f}
+.warns{margin:16px 0 0;padding:0;list-style:none;font-size:var(--t-small)}
+.warns li{padding:8px 10px;border:1px solid #ff6a4d;background:var(--panel-2);margin-top:6px;color:#f1c9c0}
+.warns li::before,.rwarns li::before{content:"CAUTION ";font:600 var(--t-micro) var(--mono);letter-spacing:.1em;color:#ff6a4d}
+.rwarns li::before{color:var(--bad)}
+.panel .idle{color:var(--panel-dim);font-size:var(--t-small)}
+
+/* Results */
+.res-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px;align-items:end;margin-bottom:22px}
+.res-sub{margin:10px 0 0;font:400 var(--t-small)/1.5 var(--body);color:var(--ink-2)}
+.verdict{font:600 var(--t-caption) var(--mono);text-transform:uppercase;letter-spacing:.1em;padding:6px 10px;border:2px solid currentColor;display:inline-block}
+.verdict.ok{color:var(--ok)} .verdict.no{color:var(--bad)}
+/* Wrapping flex rows: cells of the last row grow to the edge, so any count fills its rows with no empty ruled cells. */
+.kpis{display:flex;flex-wrap:wrap;border:2px solid var(--ink);margin:0 0 18px;overflow:hidden}
+.kpi{flex:1 1 150px;display:flex;flex-direction:column;padding:14px 14px 12px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);margin:0 -1px -1px 0}
+.kpi dt{font:400 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label);color:var(--ink-2)}
+/* Pushed to the cell foot, so values in one row share a baseline even when a label wraps. */
+.kpi dd{margin:auto 0 0;padding-top:2px;font:500 var(--t-data-lg)/1.1 var(--mono);white-space:nowrap}
+.kpi dd small{font-size:var(--t-caption);color:var(--ink-2);margin-left:3px}
+.rwarns{margin:0 0 22px;padding:0;list-style:none}
+.rwarns li{padding:10px 14px;border:2px solid var(--bad);background:color-mix(in srgb,var(--bad) 16%,var(--paper));margin-bottom:6px;font-size:var(--t-small)}
+.sec{margin-top:44px;scroll-margin-top:16px;outline:none}
+/* Section headings: solid ink box, paper title, rust edge along the foot (a bar, not a side stripe). */
+.sec>h3{font-size:var(--t-h1);font-weight:700;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;background:var(--inv);color:var(--inv-ink);border-bottom:4px solid var(--accent);padding:12px 14px 10px;margin-bottom:18px}
+.sec>h3 em{font:600 var(--t-micro) var(--mono);font-style:normal;color:var(--amber);letter-spacing:.1em}
+.fx{margin:0 0 18px;font-size:var(--t-small);color:var(--ink-2);max-width:75ch}
+/* Performance | parts + BOM | dock. One column below 1200px, where the dock becomes a bottom drawer. */
+.res-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:48px 36px;align-items:start;margin-top:40px}
+.res-grid .sec{margin-top:0}
+.col-parts{min-width:0;display:grid;gap:48px}
+@media (min-width:1200px){
+  .res-grid{grid-template-columns:minmax(0,1fr) 300px;grid-template-areas:"perf dock" "parts dock"}
+  .s-perf{grid-area:perf} .col-parts{grid-area:parts} .dock{grid-area:dock}
+}
+/* perf.css goes to 3 figure columns at a 1400px container: keep the main column past that inside the 1800px sheet. */
+@media (min-width:1900px){.res-grid{grid-template-columns:minmax(0,1fr) 300px;column-gap:32px}}
+
+/* Parts */
+.s-parts,.s-bom{container-type:inline-size}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.s-parts>.actions{margin-bottom:16px}
+.tot{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;border:2px solid var(--ink);padding:14px 16px;margin-bottom:20px}
+.tot b{font:500 var(--t-data-lg) var(--mono)}
+/* CSS columns pack categories of unequal height without dead gaps. */
+.cats{column-gap:36px}
+@container (min-width:860px){.cats{column-count:2}.cat.wide{column-span:all}}
+@container (min-width:1500px){.cats{column-count:3}}
+.cat{break-inside:avoid;border-top:1px solid var(--rule);padding:18px 0;min-width:0;scroll-margin-top:16px;outline:none}
+.cat.gap{border-top:3px solid var(--accent)}
+/* Category headings: a tinted band in the category tone with a tone rule on top, so a heading never reads like the parts under it.
+   The rule carries the separation in print, where backgrounds drop. Untoned headings fall back to ink-2. */
+.cat h4,.wiring h4{font:800 var(--t-h2) var(--head);font-stretch:75%;text-transform:uppercase;letter-spacing:.06em;color:var(--ink);margin:0 0 10px;padding:9px 12px 8px;background:color-mix(in srgb,var(--t,var(--ink-2)) 16%,var(--sheet));border-top:3px solid var(--t,var(--ink-2));display:flex;align-items:center;gap:10px;break-after:avoid}
+[data-tone]{--t:var(--ink-2)}
+[data-tone=slate]{--t:var(--slate)} [data-tone=blue]{--t:var(--blue)} [data-tone=teal]{--t:var(--teal)} [data-tone=mustard]{--t:var(--mustard)} [data-tone=accent]{--t:var(--accent)} [data-tone=ink]{--t:var(--ink-2)}
+.cat h4[data-tone]::before,.bomt .c[data-tone]::before,.d-list a[data-tone]::before,.cat.mini h5[data-tone]::before{content:"";flex:none;display:inline-block;width:9px;height:9px;background:var(--t)}
+.cat h4[data-tone]::before{width:12px;height:12px}
+/* Parts sit inset under the band and stay in the body face, normal case: content, not a heading. */
+.cat>.items,.cat>.more,.cat>.nopart,.cat>.fb{margin-left:12px}
+.bomt .c[data-tone]::before{margin-right:6px;vertical-align:0}
+.d-list a[data-tone]::before{margin-right:6px;vertical-align:0}
+.wiring{margin-top:32px;padding-top:18px;border-top:1px solid var(--rule)}
+.wiring .need{font:400 var(--t-micro) var(--mono);color:var(--ink-2);margin:0 0 10px}
+/* Wiring table: ruled like the BOM; stacks into labelled rows when its column is narrow. */
+.wt{width:100%;border-collapse:collapse;border:2px solid var(--ink);background:var(--sheet);font-size:var(--t-small)}
+.wt th,.wt td{padding:8px 10px;text-align:left;vertical-align:top;border-top:1px solid var(--rule);overflow-wrap:anywhere}
+.wt thead th{background:var(--inv);color:var(--inv-ink);font:600 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label);border:0}
+.wt .p{font-weight:600}
+.wt .c{font:400 var(--t-caption) var(--mono);color:var(--ink-2)}
+.wt .n{text-align:right;font-family:var(--mono);white-space:nowrap}
+@container (max-width:560px){
+  .wt thead{display:none}
+  .wt,.wt tbody{display:block;border:0;background:none}
+  .wt tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:10px 12px;border:1px solid var(--rule);margin-bottom:6px;background:var(--sheet)}
+  .wt th,.wt td{display:block;padding:0;border:0}
+  .wt .p{grid-column:1/-1}
+  .wt .c{grid-column:1/-1}
+  .wt .n{text-align:left;white-space:normal}
+  .wt td[data-l]::before{content:attr(data-l) " ";font:400 var(--t-micro) var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2)}
+}
+.cat .need{font:400 var(--t-micro) var(--mono);color:var(--ink-2);margin:0 0 10px 12px}
+.nopart{margin:0 0 8px;padding:8px 10px;border:2px dashed var(--accent);font-size:var(--t-small)}
+.nopart b{color:var(--accent)}
+.fb{margin:0 0 10px;font:500 var(--t-caption) var(--body);color:var(--accent)}
+.tag{font:600 var(--t-micro) var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
+.items,.opts{list-style:none;margin:0;padding:0}
+.it{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:4px 14px;padding:12px 10px;border-top:1px dashed var(--rule);overflow-wrap:anywhere;transition:background .15s,color .15s}
+.it:first-child{border-top-color:transparent}
+.it .rk{font:700 var(--t-h2)/1 var(--head);color:var(--accent);padding-top:2px}
+.it.best .rk{font-size:var(--t-data-lg)}
+.it .nm,.o-m .nm{font-family:var(--body);font-size:var(--t-body-s);text-transform:none;letter-spacing:0}
+.it .nm{font-weight:500}
+.it.best .nm{font-weight:600}
+.it .meta,.opt .meta{font:400 var(--t-micro) var(--mono);color:var(--ink-2)}
+.pr{font-family:var(--mono);text-align:right}
+.pr b{display:block;font-weight:500;font-size:var(--t-data-s)}
+.pr small{display:block;font-size:var(--t-micro);color:var(--ink-2);white-space:nowrap}
+.it-f,.o-f{display:flex;flex-direction:column;align-items:stretch;gap:8px}
+.it-f .badge,.o-f .badge{align-self:flex-start}
+.it-f{grid-column:2/-1;margin-top:8px}
+.lk{display:flex;flex-wrap:wrap;gap:8px}
+.lt{grid-column:2/-1;gap:2px 14px;align-items:center;font:400 var(--t-caption) var(--mono)}
+.opt .lt{grid-column:1/-1}
+.lt-h{color:var(--ink-2);text-transform:uppercase;font-size:var(--t-label);letter-spacing:var(--tr-label)}
+.lt a{display:inline-flex;align-items:center;min-height:32px;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.lt a:hover,.lt a:focus-visible{color:var(--accent)}
+.on .lt a{color:var(--inv-ink)}.on .lt-h{color:var(--ink-on)}
+.it-f .sel,.o-f .sel{justify-content:center;margin-left:0;width:100%}
+.d-empty{margin:8px 0 16px;font-size:var(--t-small);color:var(--panel-dim)}
+.badge{display:inline-flex;align-items:center;min-height:28px;padding:2px 8px;border:1px solid currentColor;font:600 var(--t-micro) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label);color:var(--ink-2)}
+.badge.on{color:var(--ok)}
+/* Select toggle: an empty box; pressed, the box fills and ticks. */
+.sel{margin-left:auto;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:6px 14px;border:2px solid var(--ink);background:var(--sheet);font:700 var(--t-small) var(--head);text-transform:uppercase;letter-spacing:.08em;cursor:pointer;transition:background .15s,color .15s,border-color .15s,transform .1s}
+.sel svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor}
+.sel svg rect{stroke-width:1.5}
+.sel svg path{stroke-width:2.2;opacity:0}
+.sel:hover{background:var(--ink);color:var(--paper)}
+.sel:active{transform:translateY(1px)}
+.sel[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:var(--on-amber)}
+.sel[aria-pressed="true"] svg rect{fill:var(--on-amber);stroke:var(--on-amber)}
+.sel[aria-pressed="true"] svg path{opacity:1;stroke:var(--amber)}
+.it.on,.opt.on{background:var(--inv);color:var(--inv-ink)}
+.it.on .meta,.opt.on .meta,.on .pr small{color:var(--ink-on)}
+.it.on .rk,.it.on .tag{color:var(--amber)}
+.on .badge{color:var(--ink-on)} .on .badge.on{color:var(--ok-lite)}
+.on a.btn.buy{color:var(--inv-ink);border-color:var(--inv-ink)}
+.on a.btn.buy::after{background:var(--amber)}
+.on a.btn.buy:hover,.on a.btn.buy:focus-visible{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.on :focus-visible{outline-color:var(--amber)}
+/* All-options expander */
+.more{margin-top:12px;border-top:1px solid var(--rule)}
+.more summary{display:flex;align-items:center;gap:8px;min-height:44px;cursor:pointer;list-style:none;font:600 var(--t-small) var(--head);text-transform:uppercase;letter-spacing:.08em}
+.more summary::-webkit-details-marker{display:none}
+.more summary:hover{color:var(--accent)}
+.chev{width:12px;height:12px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;transition:transform .2s}
+.more[open]>summary .chev{transform:rotate(90deg)}
+.opt{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;padding:10px;border-top:1px dashed var(--rule);overflow-wrap:anywhere;transition:background .15s,color .15s}
+.o-m .nm{display:block;font-weight:500}
+.opt .meta{display:block}
+.opt .pr{font-weight:500;font-size:var(--t-data-s)}
+.o-f{grid-column:1/-1}
+.others{margin-top:28px;padding-top:14px;border-top:2px solid var(--ink)}
+.others>h4{font:700 var(--t-h3) var(--head);letter-spacing:.06em;margin-bottom:4px}
+.o-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:0 28px;align-items:start}
+.cat.mini{padding:12px 0}
+.cat.mini h5{font:700 var(--t-h3) var(--head);font-stretch:75%;text-transform:uppercase;letter-spacing:.08em;color:var(--ink);margin:0 0 4px;padding:6px 10px 5px;background:color-mix(in srgb,var(--t,var(--ink-2)) 14%,var(--sheet));border-top:2px solid var(--t,var(--ink-2));display:flex;align-items:center;gap:8px}
+.cat.mini .more{border-top:0;margin-top:2px}
+.notes{font-size:var(--t-small);color:var(--ink-2);padding-left:18px}
+
+/* BOM table; stacks into rows when its column is narrow. */
+.empty{margin:0 0 16px;padding:14px 16px;border:2px dashed var(--rule);color:var(--ink-2);font-size:var(--t-small);max-width:75ch}
+.bomt{width:100%;border-collapse:collapse;border:2px solid var(--ink);background:var(--sheet);margin-bottom:16px}
+.bomt th,.bomt td{padding:10px 12px;text-align:left;vertical-align:top;border-top:1px solid var(--rule)}
+.bomt thead th{border:0;background:var(--inv);color:var(--inv-ink);font:600 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label)}
+.bomt .n{text-align:right;font-family:var(--mono);white-space:nowrap}
+.bomt .c{font:400 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label);color:var(--ink-2);padding-top:13px}
+.bomt .p{font-weight:600;overflow-wrap:anywhere}
+.bomt .q small{display:block;font-size:var(--t-micro);color:var(--ink-2)}
+.bomt .p small{display:block;font:400 var(--t-micro) var(--mono);color:var(--ink-2)}
+.bomt .lk{gap:6px}
+.bomt tfoot th,.bomt tfoot td{border-top:2px solid var(--ink);font:600 var(--t-body) var(--mono)}
+.bomt tfoot th{text-align:right;font:700 var(--t-h3) var(--head);letter-spacing:.1em;text-transform:uppercase}
+.bomt .bud th,.bomt .bud td{border-top:1px solid var(--rule);font-size:var(--t-small)}
+.bomt .bud.ok td{color:var(--ok)} .bomt .bud.bad td{color:var(--bad)}
+.pdf-msg{margin:0;font:400 var(--t-caption) var(--body);color:var(--ink-2)}
+.pdf-msg:empty{display:none}
+@container (max-width:700px){
+  .bomt,.bomt tbody,.bomt tfoot{display:block}
+  .bomt thead{display:none}
+  .bomt tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:10px 12px;border-top:1px solid var(--rule)}
+  .bomt tbody tr:first-child{border-top:0}
+  .bomt th,.bomt td{display:block;padding:0;border:0}
+  .bomt tbody .c{grid-area:1/1;padding:0}
+  .bomt tbody .l{grid-area:1/2/3/3;font-size:var(--t-data-s)}
+  .bomt tbody .p{grid-area:2/1}
+  .bomt tbody .q{grid-area:3/1;text-align:left}
+  .bomt tbody .u{grid-area:3/2}
+  .bomt tbody .k{grid-area:4/1/5/3;margin-top:6px}
+  .bomt .q::before,.bomt .u::before{content:attr(data-l) " ";font-size:var(--t-micro);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+  .bomt tfoot tr{border-top:2px solid var(--ink)}
+  .bomt tfoot .bud{border-top:1px solid var(--rule)}
+  .bomt tfoot th{text-align:left}
+  .bomt tfoot .k{display:none}
+}
+
+/* BOM dock: sticky instrument panel beside the results; a bottom drawer below 1200px. */
+.dock{background:var(--panel);color:var(--panel-ink);font-size:var(--t-small)}
+.dock-top{display:flex;align-items:center;gap:12px;padding:18px 18px 12px}
+.dock-h{flex:1;font-size:var(--t-small);letter-spacing:.16em;color:var(--amber)}
+.dock-tog{display:none}
+.dock-body{padding:0 18px 18px}
+.d-tot{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0;padding:12px 0 6px;border-top:1px solid var(--panel-line);font:400 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label);color:var(--panel-dim)}
+.d-tot b{font:500 var(--t-data-lg) var(--mono);letter-spacing:0;color:var(--amber)}
+.d-bud{margin:0 0 6px;font:500 var(--t-caption) var(--mono)}
+.d-bud.ok{color:var(--ok-lite)} .d-bud.bad{color:var(--bad-lite)}
+.d-list{list-style:none;margin:8px 0 16px;padding:0}
+.d-list li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 10px;padding:8px 0;border-bottom:1px dashed #34393f}
+.d-list a{grid-column:1/-1;font:400 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label);color:var(--panel-dim);text-decoration:none}
+.d-list a:hover{color:var(--amber);text-decoration:underline}
+.d-list span{font-size:var(--t-small);color:#9a9787;min-width:0;overflow-wrap:anywhere}
+.d-list .on span{color:var(--panel-ink)}
+.d-list b{font:500 var(--t-small) var(--mono);color:var(--amber);text-align:right}
+.dock-act{display:flex;flex-wrap:wrap;gap:8px}
+.dock .btn{border-color:#59616a;color:var(--panel-ink)}
+.dock a.btn,.dock a.btn:visited{color:var(--panel-ink)}
+.dock .btn:hover{background:var(--panel-ink);border-color:var(--panel-ink);color:var(--panel)}
+.dock .btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.dock .btn.pri:hover{background:var(--amber);border-color:var(--amber);color:var(--on-amber)}
+.dock :focus-visible{outline-color:var(--amber)}
+.dock .pdf-msg{margin-top:10px;color:var(--panel-dim)}
+@media (min-width:1200px){.dock{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto;scrollbar-color:#59616a var(--panel)}}
+@media (max-width:1199px){
+  .dock{position:fixed;left:0;right:0;bottom:0;z-index:6;max-height:55vh;overflow:auto;overscroll-behavior:contain;border-top:3px solid var(--amber)}
+  .dock-top{padding:6px 12px;position:sticky;top:0;background:var(--panel);z-index:1}
+  .dock-h{display:none}
+  .dock-tog{display:flex;flex:1;min-width:0;align-items:center;gap:10px;min-height:48px;padding:0;border:0;background:none;color:var(--panel-ink);cursor:pointer;text-align:left}
+  .dock-t{font:700 var(--t-h3) var(--head);letter-spacing:.14em;color:var(--amber)}
+  .dock-n{font:400 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label);color:var(--panel-dim)}
+  .dock-sum{margin-left:auto;font:500 var(--t-data-s) var(--mono);color:var(--amber);white-space:nowrap}
+  .dock-tog .chev{transform:rotate(-90deg)}
+  .dock.open .dock-tog .chev{transform:rotate(90deg)}
+  .dock-body{display:none;padding:0 12px calc(14px + env(safe-area-inset-bottom))}
+  .dock.open .dock-body{display:block}
+  /* Open drawer lifts off the sheet; the toggle's focus ring is drawn inside so the scroller does not clip it. */
+  .dock.open{box-shadow:0 -16px 36px -18px rgba(0,0,0,.6)}
+  .dock-tog:focus-visible{outline-offset:-3px}
+  .shell.wide .stage{padding-bottom:110px}
+  .shell.wide ~ .foot{padding-bottom:84px}
+}
+
+/* v4 components (SPEC-v4 "UI markup contract"). Status never rides on colour alone: every level also carries a word or a glyph. */
+/* Header tools. The masthead subtitle takes the free space, so the buttons sit together at the right edge. */
+.mast-sub{margin-right:auto}
+.theme-tog,.lib-tog{align-self:center;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:44px;min-height:44px;padding:0 12px;border:2px solid var(--ink);background:none;cursor:pointer;font:600 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label);transition:background .15s,color .15s}
+.theme-tog:hover,.lib-tog:hover,.lib-tog[aria-expanded="true"]{background:var(--ink);color:var(--paper)}
+/* Glyph drawn in CSS and shows the current theme: a crescent in light, a disc with a dotted ray ring in dark. The button carries the text label. */
+.theme-tog::before{content:"";flex:none;width:14px;height:14px;border-radius:50%;box-shadow:inset -5px -3px 0 0 currentColor}
+.theme-tog[aria-pressed="true"]::before{width:10px;height:10px;margin:2px;background:currentColor;box-shadow:none;outline:2px dotted currentColor;outline-offset:2px}
+
+/* Hover-throttle band: a light wash in the band tone, the value in the tone, and the .why line says it in words. */
+.kpi[data-band]{--b:var(--ink-2);background:color-mix(in srgb,var(--b) 10%,transparent)}
+.kpi[data-band=good]{--b:var(--ok)} .kpi[data-band=warn]{--b:var(--mustard-ink)} .kpi[data-band=bad]{--b:var(--bad)}
+.kpi[data-band] dd{color:var(--b)}
+/* The why line runs in flow under the value (it can be several lines). In a strip that has one, values sit under a two-line label slot
+   instead of at the cell foot, so values in a row still share a baseline. */
+.kpi .why{display:block;margin-top:6px;font:400 var(--t-caption)/1.35 var(--body);color:var(--ink);white-space:normal}
+.kpis:has(.why) .kpi dt{min-height:calc(2 * 1.65 * var(--t-label))}
+.kpis:has(.why) .kpi dd{margin-top:6px}
+/* Secondary figure under a KPI value (e.g. "71% throttle" under hover thrust). */
+.kpi dd .kpi-2{display:block;margin-top:2px;font:400 var(--t-caption)/1.35 var(--mono);color:var(--ink-2);white-space:normal}
+
+/* Weight class badge: the .verdict stamp's shape, toned by level; the note sits under it. */
+.wclass{display:inline-flex;align-items:center;padding:6px 10px;border:2px solid currentColor;font:600 var(--t-caption) var(--mono);text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;color:var(--ink-2)}
+.wclass[data-lvl=ok]{color:var(--ok)} .wclass[data-lvl=warn]{color:var(--mustard-ink)} .wclass[data-lvl=bad]{color:var(--bad)}
+.wclass-n{display:block;max-width:44ch;font:400 var(--t-micro)/1.45 var(--mono);color:var(--ink-2)}
+/* Status block at the right of the results head: stamps on one line, the class note under them, right-aligned to the stamps. */
+.res-st{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px 10px;max-width:min(100%,56ch)}
+.res-st .wclass-n{flex-basis:100%;max-width:none;text-align:right}
+@media (max-width:600px){.res-st{justify-content:flex-start}.res-st .wclass-n{text-align:left}}
+
+/* Battery card: ruled spec cells like the KPI strip (wrapping flex, so the last row fills), one step smaller. */
+.bat{display:flex;flex-wrap:wrap;margin:0 0 14px;border:2px solid var(--ink);background:var(--sheet);overflow:hidden}
+.bat>div{flex:1 1 150px;min-width:0;padding:10px 12px 11px;margin:0 -1px -1px 0;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.bat dt{font:400 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label);color:var(--ink-2)}
+.bat dd{margin:3px 0 0;font:500 var(--t-data-s)/1.25 var(--mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+/* Best pack size carries a sentence: give it the full row. */
+.bat>.bat-best{flex-basis:100%}
+.bat dd small{margin-left:3px;font-size:var(--t-caption);color:var(--ink-2)}
+.bat-flag{--f:var(--mustard);--fi:var(--mustard-ink);margin:0 0 6px;padding:10px 14px;max-width:75ch;border:2px solid var(--f);background:color-mix(in srgb,var(--f) 12%,var(--sheet));font-size:var(--t-small)}
+.bat-flag[data-lvl=bad]{--f:var(--bad);--fi:var(--bad)}
+.bat-flag::before{content:"CHECK ";font:600 var(--t-micro) var(--mono);letter-spacing:.1em;color:var(--fi)}
+.bat-flag[data-lvl=bad]::before{content:"CAUTION "}
+
+/* Compatibility list: a ruled table of findings; the word in <b> plus a glyph box carry the level. */
+.checks{list-style:none;margin:0 0 14px;padding:0;border:2px solid var(--ink);background:var(--sheet)}
+.chk{--c:var(--ink-2);display:grid;grid-template-columns:5.75rem minmax(0,1fr);gap:4px 12px;align-items:baseline;padding:10px 12px;border-top:1px solid var(--rule);font-size:var(--t-small);overflow-wrap:anywhere}
+.chk:first-child{border-top:0}
+.chk[data-lvl=pass]{--c:var(--ok)} .chk[data-lvl=warn]{--c:var(--mustard-ink)} .chk[data-lvl=fail]{--c:var(--bad);background:color-mix(in srgb,var(--bad) 9%,var(--sheet))}
+.chk>b{display:inline-flex;align-items:center;gap:7px;font:600 var(--t-micro) var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--c)}
+.chk>b::before{display:inline-grid;place-items:center;flex:none;width:18px;height:18px;border:1.5px solid currentColor;font:700 12px/1 var(--mono);content:"\2013";content:"\2013" / ""}
+.chk[data-lvl=pass]>b::before{content:"\2713";content:"\2713" / ""}
+.chk[data-lvl=warn]>b::before{content:"!";content:"!" / ""}
+.chk[data-lvl=fail]>b::before{content:"\2715";content:"\2715" / "";background:var(--bad);border-color:var(--bad);color:var(--sheet)}
+
+/* BOM mass and cost lines, and the measured-weight field. */
+.mass,.cost{margin:0 0 10px;max-width:75ch;font:400 var(--t-caption)/1.5 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.mass{color:var(--ink)}
+.mass[data-lvl=warn]{color:var(--mustard-ink)}
+.mass[data-lvl=warn]::before{content:"CHECK ";font-weight:600;letter-spacing:.1em}
+.field.mw{max-width:320px;margin:16px 0 18px}
+
+/* Part card deltas against the best pick: sign in the text, tone as a second cue. */
+.delta{display:inline-block;margin-left:8px;font:500 var(--t-micro) var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink-2)}
+.delta[data-dir=up]{color:var(--bad)} .delta[data-dir=down]{color:var(--ok)}
+.on .delta{color:var(--ink-on)} .on .delta[data-dir=up]{color:var(--bad-lite)} .on .delta[data-dir=down]{color:var(--ok-lite)}
+
+/* Build and first-flight checklist: a ruled box that opens; numbers set in the data face. */
+details.checklist{border:2px solid var(--ink);background:var(--sheet)}
+.checklist>summary{display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 14px;cursor:pointer;list-style:none;font:700 var(--t-h3) var(--head);font-stretch:75%;text-transform:uppercase;letter-spacing:.06em}
+.checklist>summary::-webkit-details-marker{display:none}
+.checklist>summary::before{content:"+";flex:none;width:1em;text-align:center;font:700 var(--t-h2)/1 var(--body);color:var(--accent)}
+.checklist[open]>summary::before{content:"\2212"}
+.checklist>summary:hover{background:var(--paper-2)}
+.checklist>summary:focus-visible{outline-offset:-3px}
+.checklist[open]>summary{border-bottom:1px solid var(--rule)}
+.cl{margin:0;padding:6px 14px 12px 3.25em}
+.cl li{padding:8px 0;border-top:1px dashed var(--rule);font-size:var(--t-small)}
+.cl li:first-child{border-top:0}
+.cl li::marker{font:500 var(--t-caption) var(--mono);color:var(--ink-2)}
+
+/* Glossary "?": a 20 px ring with a 32 px hit area; the note opens below as a panel readout, like the chart tooltip.
+   The note's box is the sheet (.shell), not the trigger, so ruled strips with overflow:hidden never clip it. With anchor positioning it hangs
+   under the trigger and flips to end at the trigger's right edge when it would overrun the sheet; without it, it opens at the trigger's static spot. */
+details.gl{display:inline-block;margin-left:6px;vertical-align:middle;text-transform:none;letter-spacing:0;font-stretch:100%;anchor-scope:--gl}
+.gl>summary{anchor-name:--gl;position:relative;display:grid;place-items:center;width:20px;height:20px;border:1.5px solid currentColor;border-radius:50%;cursor:help;list-style:none;font:600 12px/1 var(--mono);color:var(--ink-2)}
+.gl>summary::-webkit-details-marker{display:none}
+.gl>summary::after{content:"";position:absolute;inset:-6px}
+.gl>summary:hover,.gl[open]>summary{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.gl>summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.gl>p{position:absolute;z-index:5;position-anchor:--gl;top:auto;top:anchor(bottom);left:auto;left:anchor(left);position-try-fallbacks:flip-inline;width:max-content;max-width:min(32ch,calc(100vw - 32px));margin:6px 0 0;padding:10px 12px;background:var(--panel);color:var(--panel-ink);border:1px solid var(--panel-line);box-shadow:0 10px 24px -10px rgba(0,0,0,.6);font:400 var(--t-caption)/1.45 var(--body);text-align:left;text-transform:none;letter-spacing:0;white-space:normal}
+:is(.panel,.dock) .gl>summary{color:var(--panel-dim)}
+:is(.panel,.dock) .gl>summary:hover,:is(.panel,.dock) .gl[open]>summary{background:var(--panel-ink);border-color:var(--panel-ink);color:var(--panel)}
+:is(.panel,.dock,.on) :is(.gl>summary:focus-visible){outline-color:var(--amber)}
+.on .gl>summary{color:var(--ink-on)}
+/* Narrow screens: the note spans the sheet under the trigger, so it can never push the page sideways. */
+@media (max-width:600px){
+  .gl>p{left:12px;right:12px;top:auto;width:auto;max-width:none;position-try-fallbacks:none}
+}
+
+/* My builds drawer: a sheet pinned to the right edge on desktop, a bottom sheet on phones. */
+.lib{position:fixed;z-index:9;top:0;right:0;bottom:0;width:min(600px,100%);overflow:auto;overscroll-behavior:contain;padding:0 22px 28px;background:var(--paper);color:var(--ink);border-left:2px solid var(--ink);box-shadow:-18px 0 40px -24px rgba(0,0,0,.55)}
+.lib[hidden]{display:none}
+.lib-top{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 0 10px;margin-bottom:6px;background:var(--paper);border-bottom:3px solid var(--ink)}
+.lib-top h2{font-size:var(--t-h2);font-weight:700;outline:none}
+.lib .hint{margin:0 0 14px;font-size:var(--t-caption);color:var(--ink-2)}
+.lib-in{flex:1 1 100%;min-width:0;min-height:44px;padding:8px 10px;border:2px solid var(--ink);background:var(--sheet);font:500 var(--t-body-s) var(--body)}
+.lib :focus-visible{outline-offset:1px}
+.lib-list{list-style:none;margin:0 0 22px;padding:0}
+.lib-list li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:10px 0;border-bottom:1px dashed var(--rule)}
+.lib-list a{flex:1 1 100%;min-width:0;display:flex;align-items:center;min-height:32px;font-weight:600;color:var(--ink);overflow-wrap:anywhere;cursor:pointer}
+.lib-list a:hover{color:var(--accent)}
+.lib-list small{flex:1 1 auto;font:400 var(--t-micro) var(--mono);color:var(--ink-2)}
+.lib-list .btn.sm{padding:4px 10px;font-size:var(--t-caption)}
+.lib-list .btn[data-lib=delete]:hover{background:var(--bad);border-color:var(--bad);color:var(--on-accent)}
+.lib-list .btn[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:var(--on-amber)}
+/* Compare table scrolls inside its own frame, never the page. */
+.cmp{overflow-x:auto;max-width:100%;border:2px solid var(--ink);background:var(--sheet)}
+.cmp:empty{display:none}
+/* Words never break mid-word: each build column keeps 10ch, the row labels stick to the left edge, and the frame scrolls when 3 builds outgrow it. */
+.cmpt{width:100%;border-collapse:collapse;font-size:var(--t-small);overflow-wrap:normal;hyphens:manual}
+.cmpt th,.cmpt td{padding:8px 10px;text-align:left;vertical-align:top;border-top:1px solid var(--rule)}
+.cmpt thead :is(th,td){border:0;background:var(--inv);color:var(--inv-ink);font:600 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label)}
+.cmpt :is(td,thead th){min-width:10ch}
+.cmpt tbody th{font:400 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label);color:var(--ink-2);white-space:nowrap}
+.cmpt tbody th,.cmpt thead td{position:sticky;left:0;z-index:1;box-shadow:inset -1px 0 var(--rule)}
+.cmpt tbody th{background:var(--sheet)}
+.cmpt td{font-family:var(--mono);font-variant-numeric:tabular-nums}
+@media (max-width:600px){
+  .lib{top:auto;left:0;width:auto;max-height:88vh;max-height:88dvh;padding:0 16px calc(24px + env(safe-area-inset-bottom));border-left:0;border-top:3px solid var(--ink);box-shadow:0 -18px 40px -24px rgba(0,0,0,.55)}
+}
+
+/* Polish (v4 #12): figure surface under the KPI strip, matching tables; empty states read as blank form fields. */
+.kpis{background:var(--sheet)}
+.kpi{gap:4px}
+.empty b{color:var(--ink)}
+.d-empty{padding:12px 14px;border:1px dashed var(--panel-line);line-height:1.45}
+
+.foot{padding-block:18px;border-top:3px solid var(--ink);font:400 var(--t-caption)/1.5 var(--body);color:var(--ink-2)}
+.foot p{margin:0;max-width:90ch}
+
+@media (max-width:900px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .shell::after{display:none}
+  .stage{padding-bottom:120px}
+  .panel{position:fixed;top:auto;align-self:auto;left:0;right:0;bottom:0;z-index:5;padding:8px 14px;border-top:3px solid var(--amber)}
+  .panel h2,.panel .gauge,.panel .warns{display:none}
+  .panel dl.rows{display:flex;gap:10px;justify-content:space-between}
+  .panel .ro{flex:1;flex-direction:column;border:0;padding:0;min-width:0;gap:0}
+  .panel .ro:nth-child(2),.panel .ro:nth-child(3),.panel .ro.lch{display:none}
+  .panel .ro dd{font-size:var(--t-data-s);text-align:left}
+  .panel .idle{margin:0;font-size:var(--t-caption)}
+  body{padding-bottom:78px}
+  .rail b{display:none}
+  .rail button{justify-content:center;padding:10px 2px}
+  .rail span{font-size:var(--t-small);letter-spacing:.03em}
+}
+@media (max-width:480px){
+  body{font-size:var(--t-body-s)}
+  .it{grid-template-columns:22px minmax(0,1fr)}
+  .it .pr{grid-column:2;text-align:left}
+  .kpi{flex-basis:130px}
+  .kpi dd{font-size:var(--t-data)}
+  .tot b{font-size:var(--t-data)}
+  .dock-n{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}html{scroll-behavior:auto}}
+@media print{
+  /* Print is the light sheet whatever the theme: forcing the scheme resolves every light-dark() token to its light value. */
+  :root,:root[data-theme]{color-scheme:light!important}
+  html{background:#fff}
+  .mast-sub,.panel,.rail,.nav,.skip,.noprint,.theme-tog,.lib-tog,.lib,.gl,.s-perf,.kpis,.rwarns,.dock,.more,.sel,.others,.badge{display:none!important}
+  .shell,.res-grid,.col-parts{display:block}
+  .stage{padding:0}
+  .btn{display:none}
+  .lk a{display:block;font:400 var(--t-micro) var(--mono);text-decoration:none;color:#000;border:0;padding:0;min-height:0}
+  .lk a::after{content:" " attr(href);width:auto;height:auto;margin:0;background:none;-webkit-mask:none;mask:none}
+  .it.on,.opt.on{background:none;color:#000;outline:2px solid #000}
+  .cat h4,.cat.mini h5,.wiring h4{border-top-color:#000;border-bottom:1px solid #000}
+}

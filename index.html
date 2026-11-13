@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<title>DroneCalc - Drone calculator and bill of materials</title>
+<meta name="description" content="DroneCalc, the drone calculator and bill of materials: answer four questions about your mission and get weight, power, flight time, matched parts with local buy links in your currency, and a PDF bill of materials.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%2314181c' stroke-width='3'/%3E%3Cpath d='M16 2v28M2 16h28' stroke='%23b53a08' stroke-width='3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75,600..800&family=Atkinson+Hyperlegible+Next:wght@400..600&family=JetBrains+Mono:wght@400..600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/main.css">
+<link rel="stylesheet" href="css/perf.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="mast">
+  <div class="mast-id">
+    <span class="mast-mark" aria-hidden="true"></span>
+    <h1>DroneCalc</h1>
+  </div>
+  <p class="mast-sub">Drone calculator and bill of materials &middot; Form DC-2 &middot; Rev. 2026-11</p>
+  <button type="button" class="lib-tog" aria-expanded="false" aria-controls="lib">My builds</button>
+  <button type="button" class="theme-tog" aria-pressed="false"><span class="sr">Dark theme</span></button>
+</header>
+<aside class="lib" id="lib" aria-labelledby="lib-h" hidden></aside>
+
+<div class="shell" id="shell">
+  <main id="main" class="stage" tabindex="-1"></main>
+  <aside class="panel" id="panel" aria-label="Live readout"></aside>
+</div>
+
+<footer class="foot">
+  <p>Estimates use momentum theory with fixed efficiency assumptions. Verify with a bench test before flight. Prices and links checked 2026-11-06 and may drift; converted prices use approximate exchange rates.</p>
+</footer>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

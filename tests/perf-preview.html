@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Performance preview - DroneCalc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75,600..800&family=Atkinson+Hyperlegible+Next:wght@400..600&family=JetBrains+Mono:wght@400..600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/main.css">
+<link rel="stylesheet" href="../css/perf.css">
+<style>.pv{width:100%;max-width:1800px;margin:0 auto;padding:var(--pad)}.pv>p{font:400 12px var(--mono);color:var(--ink-2);margin:0}</style>
+</head>
+<body>
+<main class="pv">
+  <p>PERF preview: fake quad, VTOL, tiltrotor and fixed-wing results (fixtures below, shared with tests/perf.test.mjs). Add #demo for tooltip and table states.</p>
+  <section class="sec s-perf" aria-labelledby="h-q"><h3 id="h-q"><em>FIG</em>Performance, quad</h3><div id="perf-quad"></div></section>
+  <section class="sec s-perf" aria-labelledby="h-v"><h3 id="h-v"><em>FIG</em>Performance, VTOL</h3><div id="perf-vtol"></div></section>
+  <section class="sec s-perf" aria-labelledby="h-t"><h3 id="h-t"><em>FIG</em>Performance, tiltrotor</h3><div id="perf-tiltrotor"></div></section>
+  <section class="sec s-perf" aria-labelledby="h-f"><h3 id="h-f"><em>FIG</em>Performance, fixed wing</h3><div id="perf-fixedwing"></div></section>
+</main>
+<!-- Fixtures: realistic fakes from first-order physics (momentum theory for rotors, a drag polar for the wing), not the engine. -->
+<script id="fx">
+globalThis.PERF_FIXTURES = (() => {
+  const g = 9.80665, rho = 1.225, usable = 0.8 * 0.9; // 80 % depth of discharge, 10 % reserve kept back
+  const R = (v, d = 0) => Math.round(v * 10 ** d) / 10 ** d;
+  const lin = (a, b, n) => Array.from({ length: n }, (_, i) => a + ((b - a) * i) / (n - 1));
+  const disc = (n, inch) => n * Math.PI * ((inch * 0.0254) / 2) ** 2;
+  const hoverW = (kg, A, fm = 0.66, eta = 0.8) => Math.pow(kg * g, 1.5) / Math.sqrt(2 * rho * A) / fm / eta;
+  const best = (lo, hi, f) => { let b = lo, bv = -Infinity; for (let v = lo; v <= hi; v += 0.05) { const y = f(v); if (y > bv) { bv = y; b = v; } } return R(b, 1); };
+  const total = (w) => Object.values(w).reduce((a, b) => a + b, 0);
+  const throttle = (Tmax, A, V) => lin(10, 100, 10).map((pct) => {
+    const T = Tmax * (pct / 100) ** 2, p = hoverW(T / 1000, A) * (1 + 0.1 * (pct / 100) ** 2) + 6; // + ESC/idle losses
+    return { pct, thrustG: R(T), powerW: R(p, 1), currentA: R(p / V, 2), gPerW: R(T / p, 2) };
+  });
+  const phases = (list) => list.reduce((o, [phase, d, w]) => { const p = o[o.length - 1]; o.push({ phase, startS: p ? p.startS + p.durationS : 0, durationS: R(d), powerW: R(w, 1) }); return o; }, []);
+
+  function quad() { // mapping quad, 13 in props, 6S Li-ion
+    const N = 4, inch = 13, A = disc(N, inch), CdA = 0.045, av = 12, minTWR = 2, V = 21.6, cruise = 12, whKg = 200, wh = 133;
+    const weights = { frameG: 300, motorsG: 380, escG: 90, fcG: 40, batteryG: 665, propsG: 70, payloadG: 500, otherG: 340 };
+    const dry = (total(weights) - weights.batteryG - weights.payloadG) / 1000, pay = weights.payloadG / 1000;
+    const auwOf = (p, whx) => dry + p + whx / whKg, auw = auwOf(pay, wh), Tmax = minTWR * auw * 1000;
+    const P = (v, m) => { const vh = Math.sqrt((m * g) / (2 * rho * A)), vi = Math.sqrt(Math.sqrt(v ** 4 / 4 + vh ** 4) - (v * v) / 2); return (hoverW(m, A) * vi) / vh + (0.5 * rho * CdA * v ** 3) / 0.55 + av; };
+    const tMin = (whx, p) => ((whx * usable) / p) * 60, ph = P(0, auw), pc = P(cruise, auw);
+    const toS = 15, ldS = 25, cruS = ((wh * usable - (1.3 * ph * toS + 0.85 * ph * ldS) / 3600) / pc) * 3600, resS = ((wh * 0.8 * 0.1) / ph) * 3600;
+    return {
+      ok: true, auwKg: R(auw, 3), dryWeightKg: R(dry, 3), weights, frameSizeMm: 580, propInch: inch, motorCount: N, motorKv: 400, motorStatorMm: '3510',
+      thrustPerMotorG: R(Tmax / N), maxThrustG: R(Tmax), twr: minTWR, hoverThrottlePct: R(100 * Math.sqrt(1 / minTWR), 1),
+      batteryCells: 6, batteryMah: 6160, batteryWh: wh, batteryCRating: 10, batteryChemistry: 'liion', escContinuousA: 35, escBurstA: 46,
+      hoverPowerW: R(ph), avgPowerW: R(pc), peakCurrentA: R((ph * 2.83) / V), estFlightMin: R((toS + cruS + ldS) / 60, 1),
+      rangeKm: R((cruise * cruS) / 1000, 2), cruiseMs: cruise, warnings: [], meetsTarget: true, vtol: null,
+      performance: {
+        speed: lin(0, 1.6 * cruise, 17).map((v) => { const p = P(v, auw), t = tMin(wh, p); return { ms: R(v, 2), powerW: R(p, 1), currentA: R(p / V, 2), flightMin: R(t, 2), rangeKm: R((v * t * 60) / 1000, 3) }; }),
+        payload: lin(0, Math.max(1.5 * pay, 0.5), 11).map((kg) => { const m = auwOf(kg, wh); return { kg: R(kg, 3), flightMin: R(tMin(wh, P(cruise, m)), 2), twr: R(Tmax / 1000 / m, 3) }; }),
+        battery: lin(0.5 * wh, 2 * wh, 11).map((whx) => { const m = auwOf(pay, whx); return { wh: R(whx, 1), flightMin: R(tMin(whx, P(cruise, m)), 2), auwKg: R(m, 3) }; }),
+        throttle: throttle(Tmax, A, V),
+        profile: phases([['takeoff', toS, 1.3 * ph], ['cruise', cruS, pc], ['landing', ldS, 0.85 * ph], ['reserve', resS, ph]]),
+        bestSpeed: { enduranceMs: best(0, 1.6 * cruise, (v) => 1 / P(v, auw)), rangeMs: best(0.5, 1.6 * cruise, (v) => v / P(v, auw)) },
+      },
+    };
+  }
+
+  function vtol(tilt) { // mapping quadplane: 4 x 15 in lift, 11 in pusher, foam wing, 6S Li-ion. tilt: quad-tilt, no pusher
+    const S = 0.58, span = 2.1, AR = (span * span) / S, cd0 = tilt ? 0.048 : 0.04, k = 1 / (Math.PI * 0.75 * AR), clmax = 1.25, av = 14;
+    const A = disc(4, 15), minTWR = 2, cruise = 16, wh = 216, whKg = 200, V = 21.6, hoverS = 90, transitionS = 30;
+    const weights = { frameG: 980, motorsG: 520, escG: 170, fcG: 60, batteryG: 1080, propsG: 110, payloadG: 500, otherG: 410, ...(tilt ? { tiltMechanismG: 240, motorsG: 480 } : {}) };
+    const dry = (total(weights) - weights.batteryG - weights.payloadG) / 1000, pay = weights.payloadG / 1000;
+    const auwOf = (p, whx) => dry + p + whx / whKg, auw = auwOf(pay, wh), Tmax = minTWR * auw * 1000;
+    const etaP = (v) => (tilt ? 0.56 : 0.65) * (1 - Math.exp(-v / 7)); // efficiency rises with airspeed; tilted lift rotors run below a pusher
+    const Pc = (v, m) => { const W = m * g, qS = 0.5 * rho * v * v * S; return ((qS * cd0 + (W * W * k) / qS) * v) / etaP(v) + av; };
+    const stall = (m) => Math.sqrt((2 * m * g) / (rho * S * clmax)), hov = (m) => hoverW(m, A, 0.65, 0.8) + av, tra = (m) => 1.3 * hov(m);
+    const cruiseMin = (v, m, whx) => Math.max(0, ((whx * usable - (hov(m) * hoverS + tra(m) * transitionS) / 3600) / Pc(v, m)) * 60);
+    const flight = (v, m, whx) => cruiseMin(v, m, whx) + (hoverS + transitionS) / 60;
+    const vs = stall(auw), cm = cruiseMin(cruise, auw, wh), ph = hov(auw), pt = tra(auw), pc = Pc(cruise, auw);
+    return {
+      ok: true, auwKg: R(auw, 3), dryWeightKg: R(dry, 3), weights, frameSizeMm: 0, propInch: 15, motorCount: 4, motorKv: 380, motorStatorMm: '4010',
+      thrustPerMotorG: R(Tmax / 4), maxThrustG: R(Tmax), twr: minTWR, hoverThrottlePct: R(100 * Math.sqrt(1 / minTWR), 1),
+      batteryCells: 6, batteryMah: 10000, batteryWh: wh, batteryCRating: 8, batteryChemistry: 'liion', escContinuousA: 50, escBurstA: 65,
+      hoverPowerW: R(ph), avgPowerW: R(pc), peakCurrentA: R((ph * 2.83) / V), estFlightMin: R(flight(cruise, auw, wh), 1),
+      rangeKm: R((cruise * cm * 60) / 1000, 1), cruiseMs: cruise, warnings: [], meetsTarget: true,
+      vtol: { wingspanMm: span * 1000, wingAreaDm2: S * 100, aspectRatio: R(AR, 2), wingLoadingGdm2: R((auw * 1000) / (S * 100), 1), liftToDrag: R(1 / (2 * Math.sqrt(cd0 * k)), 1),
+        stallMs: R(vs, 1), cruiseMs: cruise, liftMotorCount: 4, pusher: tilt ? null : { statorMm: '2814', kv: 700, thrustG: 1600, propInch: 11 },
+        hoverS, transitionS, cruiseMin: R(cm, 1), rangeKm: R((cruise * cm * 60) / 1000, 1), servoCount: 4,
+        ...(tilt ? { type: 'tiltrotor', tilt: { motorCount: 4, servoCount: 4, tiltTimeS: 6, transitionAngleDeg: 90 } } : { type: 'quadplane' }) },
+      performance: {
+        speed: lin(vs, 1.6 * cruise, 15).map((v) => { const p = Pc(v, auw), c = cruiseMin(v, auw, wh); return { ms: R(v, 2), powerW: R(p, 1), currentA: R(p / V, 2), flightMin: R(c + (hoverS + transitionS) / 60, 2), rangeKm: R((v * c * 60) / 1000, 3) }; }),
+        payload: lin(0, Math.max(1.5 * pay, 0.5), 11).map((kg) => { const m = auwOf(kg, wh); return { kg: R(kg, 3), flightMin: R(flight(cruise, m, wh), 2), twr: R(Tmax / 1000 / m, 3) }; }),
+        battery: lin(0.5 * wh, 2 * wh, 11).map((whx) => { const m = auwOf(pay, whx); return { wh: R(whx, 1), flightMin: R(flight(cruise, m, whx), 2), auwKg: R(m, 3) }; }),
+        throttle: throttle(Tmax, A, V),
+        profile: phases([['takeoff', 45, ph], ['transition', 15, pt], ['cruise', cm * 60, pc], ['transition', 15, pt], ['landing', 45, ph], ['reserve', ((wh * 0.8 * 0.1) / pc) * 3600, pc]]),
+        bestSpeed: { enduranceMs: best(vs, 1.6 * cruise, (v) => 1 / Pc(v, auw)), rangeMs: best(vs, 1.6 * cruise, (v) => v / Pc(v, auw)) },
+      },
+    };
+  }
+  function fixedwing() { // mapping fixed wing: 2.0 m foam airframe, one 12 in tractor, 6S Li-ion; cruise at the best-endurance speed
+    const S = 0.44, span = 2.0, AR = (span * span) / S, cd0 = 0.032, k = 1 / (Math.PI * 0.8 * AR), clmax = 1.2, av = 12, V = 21.6, wh = 216, whKg = 200, inch = 12;
+    const weights = { frameG: 860, motorsG: 140, escG: 55, fcG: 60, servosG: 90, batteryG: 1080, propsG: 30, payloadG: 500, otherG: 220 };
+    const dry = (total(weights) - weights.batteryG - weights.payloadG) / 1000, pay = weights.payloadG / 1000;
+    const auwOf = (p, whx) => dry + p + whx / whKg, auw = auwOf(pay, wh), Tmax = 0.75 * auw * 1000;
+    const etaP = (v) => 0.62 * (1 - Math.exp(-v / 6)); // prop + motor + ESC, about 0.55-0.6 at cruise
+    const Pc = (v, m) => { const W = m * g, qS = 0.5 * rho * v * v * S; return ((qS * cd0 + (W * W * k) / qS) * v) / etaP(v) + av; };
+    const vs = Math.sqrt((2 * auw * g) / (rho * S * clmax)), be = best(1.3 * vs, 3 * vs, (v) => 1 / Pc(v, auw)), cruise = be;
+    const pc = Pc(cruise, auw), launchS = 4, climbS = 60, loiterS = 600, descentS = 90;
+    const pl = 9 * pc, pcl = 1.7 * pc, plo = 1.1 * pc, pd = 0.3 * pc; // launch at full throttle; loiter in slow circles
+    const fixedS = launchS + climbS + loiterS + descentS, fixedJ = pl * launchS + pcl * climbS + plo * loiterS + pd * descentS;
+    const left = (v, m, whx) => Math.max(0, (whx * usable * 3600 - fixedJ) / Pc(v, m)); // cruise seconds
+    const fmin = (v, m, whx) => (left(v, m, whx) + fixedS) / 60, cruS = left(cruise, auw, wh), resS = (wh * 0.8 * 0.1 * 3600) / pc;
+    const flightMin = fmin(cruise, auw, wh), LD = 1 / (2 * Math.sqrt(cd0 * k)), rangeKm = (cruise * cruS) / 1000;
+    return {
+      ok: true, auwKg: R(auw, 3), dryWeightKg: R(dry, 3), weights, frameSizeMm: 0, propInch: inch, motorCount: 1, motorKv: 620, motorStatorMm: '3515',
+      thrustPerMotorG: R(Tmax), maxThrustG: R(Tmax), twr: R(Tmax / 1000 / auw, 2), hoverThrottlePct: null,
+      batteryCells: 6, batteryMah: 10000, batteryWh: wh, batteryCRating: 5, batteryChemistry: 'liion', escContinuousA: 40, escBurstA: 60,
+      hoverPowerW: null, avgPowerW: R(pc), peakCurrentA: R(pl / V, 1), estFlightMin: R(flightMin, 1), rangeKm: R(rangeKm, 1), cruiseMs: cruise,
+      warnings: [], meetsTarget: true, vtol: null, fpvClass: null,
+      fixedWing: { wingspanMm: span * 1000, wingAreaDm2: S * 100, aspectRatio: R(AR, 2), wingLoadingGdm2: R((auw * 1000) / (S * 100), 1), liftToDrag: R(LD, 1),
+        stallMs: R(vs, 1), cruiseMs: cruise, launch: 'bungee', motor: { statorMm: '3515', kv: 620, thrustG: R(Tmax), propInch: inch }, rangeKm: R(rangeKm, 1), endurance: R(flightMin, 1) },
+      performance: {
+        speed: lin(vs, 1.8 * cruise, 15).map((v) => { const p = Pc(v, auw), c = left(v, auw, wh); return { ms: R(v, 2), powerW: R(p, 1), currentA: R(p / V, 2), flightMin: R((c + fixedS) / 60, 2), rangeKm: R((v * c) / 1000, 3) }; }),
+        payload: lin(0, Math.max(1.5 * pay, 0.5), 11).map((kg) => { const m = auwOf(kg, wh); return { kg: R(kg, 3), flightMin: R(fmin(cruise, m, wh), 2), twr: R(Tmax / 1000 / m, 3) }; }),
+        battery: lin(0.5 * wh, 2 * wh, 11).map((whx) => { const m = auwOf(pay, whx); return { wh: R(whx, 1), flightMin: R(fmin(cruise, m, whx), 2), auwKg: R(m, 3) }; }),
+        throttle: lin(10, 100, 10).map((pct) => { const T = Tmax * (pct / 100) ** 2, p = 1.25 * hoverW(T / 1000, disc(1, inch), 0.6, 0.8) + 4; return { pct, thrustG: R(T), powerW: R(p, 1), currentA: R(p / V, 2), gPerW: R(T / p, 2) }; }),
+        profile: phases([['launch', launchS, pl], ['climb', climbS, pcl], ['cruise', cruS, pc], ['loiter', loiterS, plo], ['descent', descentS, pd], ['reserve', resS, pc]]),
+        bestSpeed: { enduranceMs: be, rangeMs: best(vs, 1.8 * cruise, (v) => v / Pc(v, auw)) },
+      },
+    };
+  }
+  const fpv = { ...quad(), fpvClass: '7' }; // the quad fake relabelled as a 7 in build, for the caption label only
+  return { quad: quad(), vtol: vtol(false), tiltrotor: vtol(true), fixedwing: fixedwing(), fpv };
+})();
+</script>
+<script type="module">
+import { renderPerformance, bindPerformance } from '../js/ui/perf.js';
+const FX = globalThis.PERF_FIXTURES;
+// ?w=375 pins the column width (headless Chrome will not open a window narrower than ~500 px); ?only=quad|vtol|tiltrotor|fixedwing
+const qs = new URLSearchParams(location.search), pin = +qs.get('w');
+if (pin) document.querySelector('.pv').style.cssText = `width:${pin}px;max-width:none;margin:0;padding:16px`;
+document.querySelector('.pv>p').textContent += ` viewport ${innerWidth}px.`;
+const only = qs.get('only');
+for (const k of ['quad', 'vtol', 'tiltrotor', 'fixedwing']) {
+  const el = document.getElementById(`perf-${k}`), r = FX[k];
+  if (only && only !== k) { el.parentElement.remove(); continue; }
+  el.innerHTML = renderPerformance(r, { missionLabel: 'Mapping / survey' });
+  bindPerformance(el);
+  bindPerformance(el); // idempotent
+}
+if (+qs.get('from')) document.querySelectorAll('.pf').forEach((f, i) => { if (i < +qs.get('from')) f.remove(); }); // ?from=N skips figures for close-up shots
+if (location.hash === '#demo') setTimeout(() => { // tooltip, crosshair and table states for screenshots
+  const svgs = document.querySelectorAll('.pf-svg');
+  svgs[0].focus();
+  svgs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+  const sv = svgs[svgs.length > 6 ? 10 : 4], p = sv.getBoundingClientRect();
+  sv.dispatchEvent(new PointerEvent('pointermove', { clientX: p.left + p.width * 0.5, clientY: p.top + p.height * 0.5, bubbles: true, pointerType: 'mouse' }));
+  document.querySelectorAll('[data-pf="table"]')[2].click();
+}, 400);
+</script>
+</body>
+</html>
