@@ -202,3 +202,7 @@ DroneCalc does not install anything outside its own folder, so removing it takes
    You can also clear it in the browser's site-data settings for `127.0.0.1` (and for `localhost` if you used that address, or for any other port you used). The data is stored separately for each address and port.
 
 Git, Python and Node.js are general tools and were not installed by DroneCalc. Remove them through your system's usual uninstall method only if you installed them just for this project and no longer need them.
+
+## License
+
+Released under the [MIT License](LICENSE). The license covers the DroneCalc code. Product names, prices and store links in the parts catalog belong to their respective makers and sellers.
