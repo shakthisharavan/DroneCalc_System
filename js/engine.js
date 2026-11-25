@@ -6,6 +6,11 @@
 // v3: "tiltrotor" (quad-tilt VTOL, result.vtol.type/tilt), "fixedwing" (result.fixedWing), FPV size classes (FPV_CLASSES, input fpvClass).
 // v4: frame materials titanium, pacf, petg, balsa; weights.hardwareG (screws, standoffs, ties, harness) in AUW; result.wiring list.
 
+import { t } from "./i18n/i18n.js";
+
+// Display text of the data tables below (labels, notes) is read from the active language catalog at access time: key <prefix>.<id>.<field>.
+const localize = (tbl, prefix, fields) => { for (const id of Object.keys(tbl)) for (const f of fields) Object.defineProperty(tbl[id], f, { enumerable: true, get: () => t(`${prefix}.${id}.${f}`) }); return tbl; };
+
 // ---- Constants (all documented) ----
 const G = 9.80665;          // m/s^2
 const RHO0 = 1.225;         // kg/m^3, ISA sea level air density
@@ -123,17 +128,31 @@ const FW = {
   handKg: 2, handStall: 9, bungeeKg: 15 // launch: hand < 2 kg; 2-5 kg hand if stall <= 9 m/s else bungee; bungee <= 15 kg; else runway
 };
 
+// v5 battery model: voltage sag, cold derate, age fade. Every figure is an ESTIMATE (real packs differ 2x by brand, C class and history).
+// Pack resistance R = R_cell x S / P: with P = pack Ah / cell Ah that is S x rAh / Ah, rAh = R_cell x cell Ah. LiPo 8 mohm Ah (6S 1.3 Ah high-C
+// ~37 mohm, 6S 5 Ah ~10 mohm); Li-ion 21700 (P42A 12 mohm x 4.2 Ah) 50 mohm Ah. Loaded cell volts = nominal - I x R / S, with I the engine's
+// P / nominal volts. Nominal is the resting voltage near the end of the usable capacity: a conservative floor (a fresh pack sits higher).
+// Cold: below coldC capacity falls 1% per C (0 C 85%, -10 C 75%, -20 C 65%) and resistance rises 4% per C (0 C x1.6, -10 C x2.0, -20 C x2.4).
+// Age: capacity x (1 - fade), resistance x (1 + ageR x fade): 20% fade ~ x1.5, 40% ~ x2.0 (end-of-life packs read 1.5-2x new). Floor V/cell: LiPo 3.3
+// (below it cells are damaged), Li-ion 3.0 (the 21700 cutoff is ~2.5 V, flight controllers warn at 3.0).
+// The hover calibration factor (measured / predicted hover current) is limited to this range: outside it the measurement is far more likely wrong
+// (units, a different build, a clamp meter on the wrong lead) than real, and an unbounded factor gave absurd flight times (0.1 A measured: thousands of minutes).
+// Above the range the factor is capped (a pessimistic limit); below it the calibration is not applied (a low reading must never lengthen the flight).
+const KAPPA = [0.5, 2];
+const BATT = { rAh: { lipo: 0.008, liion: 0.05 }, floor: { lipo: 3.3, liion: 3.0 }, coldC: 15, capPerC: 0.01, rPerC: 0.04, ageR: 2.5 };
+
 // Mission fields beyond the contract: diskLoad (N/m^2 at 1 kg AUW, scaled by AUW^0.25 since big drones load props harder -> picks prop size), powerMult (avg/hover power),
 // defaultFlightMin/maxFlightMin (wizard default / realistic ceiling), maxCells (pack voltage cap for the class, ignored when payload > 1 kg),
 // avionicsW (FC+cam+VTX+payload electronics), otherBaseG (cam/gimbal/pump/release gear), fcG, liionOK, needsGps.
 export const MISSIONS = {
-  delivery:    { label: "Delivery",             defaultFlightMin: 20, maxFlightMin: 45, defaultPayloadKg: 1.0,  minTWR: 2.0, cruiseMs: 12, reserve: 0.15, note: "Point-to-point cargo; reserve for abort/return.", diskLoad: 82,  powerMult: 1.0, avionicsW: 8,  otherBaseG: 130, fcG: 40, liionOK: true,  needsGps: true },
-  inspection:  { label: "Inspection",           defaultFlightMin: 25, maxFlightMin: 50, defaultPayloadKg: 0.3,  minTWR: 2.0, cruiseMs: 8,  reserve: 0.10, note: "Gimbal camera, long hover/orbit time.",          diskLoad: 78,  powerMult: 1.0, avionicsW: 18, otherBaseG: 180, fcG: 40, liionOK: true,  needsGps: true },
-  agriculture: { label: "Agriculture spraying", defaultFlightMin: 12, maxFlightMin: 25, defaultPayloadKg: 5.0,  minTWR: 2.0, cruiseMs: 6,  reserve: 0.10, note: "Liquid payload, slow low pass, pump load.",       diskLoad: 61,  powerMult: 1.1, avionicsW: 25, otherBaseG: 250, fcG: 40, liionOK: true,  needsGps: true },
-  interceptor: { label: "Interceptor",          defaultFlightMin: 6, maxFlightMin: 15, maxCells: 8, defaultPayloadKg: 0.15, minTWR: 6.0, cruiseMs: 30, reserve: 0.10, note: "High speed, high thrust, short sortie.",         diskLoad: 132, powerMult: 2.2, avionicsW: 10, otherBaseG: 80,  fcG: 40, liionOK: false, needsGps: true },
-  mapping:     { label: "Mapping / survey",     defaultFlightMin: 30, maxFlightMin: 60, defaultPayloadKg: 0.25, minTWR: 2.0, cruiseMs: 12, reserve: 0.10, note: "Efficient cruise, survey camera.",               diskLoad: 67,  powerMult: 0.9, avionicsW: 12, otherBaseG: 150, fcG: 40, liionOK: true,  needsGps: true },
-  fpv:         { label: "FPV freestyle/racing", defaultFlightMin: 5, maxFlightMin: 12, maxCells: 6, defaultPayloadKg: 0.1,  minTWR: 7.0, cruiseMs: 18, reserve: 0.05, note: "Aggressive manual flying, action camera.",       diskLoad: 151, powerMult: 2.6, avionicsW: 6,  otherBaseG: 55,  fcG: 12, liionOK: false, needsGps: false }
+  delivery:    { defaultFlightMin: 20, maxFlightMin: 45, defaultPayloadKg: 1.0,  minTWR: 2.0, cruiseMs: 12, reserve: 0.15, diskLoad: 82,  powerMult: 1.0, avionicsW: 8,  otherBaseG: 130, fcG: 40, liionOK: true,  needsGps: true },
+  inspection:  { defaultFlightMin: 25, maxFlightMin: 50, defaultPayloadKg: 0.3,  minTWR: 2.0, cruiseMs: 8,  reserve: 0.10, diskLoad: 78,  powerMult: 1.0, avionicsW: 18, otherBaseG: 180, fcG: 40, liionOK: true,  needsGps: true },
+  agriculture: { defaultFlightMin: 12, maxFlightMin: 25, defaultPayloadKg: 5.0,  minTWR: 2.0, cruiseMs: 6,  reserve: 0.10, diskLoad: 61,  powerMult: 1.1, avionicsW: 25, otherBaseG: 250, fcG: 40, liionOK: true,  needsGps: true },
+  interceptor: { defaultFlightMin: 6, maxFlightMin: 15, maxCells: 8, defaultPayloadKg: 0.15, minTWR: 6.0, cruiseMs: 30, reserve: 0.10, diskLoad: 132, powerMult: 2.2, avionicsW: 10, otherBaseG: 80,  fcG: 40, liionOK: false, needsGps: true },
+  mapping:     { defaultFlightMin: 30, maxFlightMin: 60, defaultPayloadKg: 0.25, minTWR: 2.0, cruiseMs: 12, reserve: 0.10, diskLoad: 67,  powerMult: 0.9, avionicsW: 12, otherBaseG: 150, fcG: 40, liionOK: true,  needsGps: true },
+  fpv:         { defaultFlightMin: 5, maxFlightMin: 12, maxCells: 6, defaultPayloadKg: 0.1,  minTWR: 7.0, cruiseMs: 18, reserve: 0.05, diskLoad: 151, powerMult: 2.6, avionicsW: 6,  otherBaseG: 55,  fcG: 12, liionOK: false, needsGps: false }
 };
+localize(MISSIONS, "mission", ["label", "note"]);
 
 // FPV size classes: when mission is fpv these override MISSIONS.fpv. propInch is fixed (not sized from disk loading), stator/statorMaxG
 // replace the LIFT_STATORS pick (class-to-stator table), minTWR is the class's thrust:weight. powerMult = average / hover power:
@@ -141,13 +160,14 @@ export const MISSIONS = {
 // Real builds: 5in 2306 on 6S 1100-1500 mAh, 600-700 g, 3-6 min; 7in 2807 1300KV on 6S 3000 mAh LiPo (~1 kg, 10-12 min) or 6S1P-2P
 // Li-ion (15-25 min); 10in 3115 on 6S 5000 mAh LiPo (~1.8 kg, ~15 min) or 6S2P Li-ion (20-35 min).
 export const FPV_CLASSES = {
-  "5":  { label: "5 in freestyle / racing", propInch: 5, defaultFlightMin: 5, maxFlightMin: 10, typicalAuwG: 650, note: "Freestyle and racing: 6S LiPo, punchy and agile, a few minutes per pack.",
+  "5":  { propInch: 5, defaultFlightMin: 5, maxFlightMin: 10, typicalAuwG: 650,
     minTWR: 7, minCells: 6, maxCells: 6, stator: "2306", statorMaxG: 1600, cruiseMs: 18, powerMult: 2.6, reserve: 0.05, avionicsW: 6, otherBaseG: 55, fcG: 12, liionOK: false, needsGps: false },
-  "7":  { label: "7 in long range", propInch: 7, defaultFlightMin: 12, maxFlightMin: 25, typicalAuwG: 1000, note: "Long-range cruiser: 6S LiPo or 6S/4S Li-ion, GPS rescue, smooth cinematic flight.",
+  "7":  { propInch: 7, defaultFlightMin: 12, maxFlightMin: 25, typicalAuwG: 1000,
     minTWR: 4, minCells: 6, maxCells: 6, stator: "2807", statorMaxG: 2200, cruiseMs: 17, powerMult: 1.4, reserve: 0.1, avionicsW: 8, otherBaseG: 75, fcG: 15, liionOK: true, liionFromMin: 15, needsGps: true },
-  "10": { label: "10 in long range heavy", propInch: 10, defaultFlightMin: 15, maxFlightMin: 35, typicalAuwG: 1800, note: "Heavy long range: big Li-ion packs or payloads, efficient 10in props, GPS.",
+  "10": { propInch: 10, defaultFlightMin: 15, maxFlightMin: 35, typicalAuwG: 1800,
     minTWR: 3, minCells: 6, maxCells: 6, stator: "3115", statorMaxG: 3000, cruiseMs: 16, powerMult: 1.3, reserve: 0.1, avionicsW: 9, otherBaseG: 95, fcG: 20, liionOK: true, liionFromMin: 18, needsGps: true }
 };
+localize(FPV_CLASSES, "fpv", ["label", "note"]);
 
 // Frame material: density g/cc, stiffness 1-10, relative cost (carbon = 1). Optional frameRel = airframe mass vs carbon where the
 // plate-stiffness rule (comps) does not apply: foam needs thick sections plus embedded spars; EPO VTOL kits weigh ~1.2x molded carbon;
@@ -155,16 +175,17 @@ export const FPV_CLASSES = {
 // titanium 2.8x carbon (E ~110 GPa, heavy-duty multirotors only); PA-CF 1.1x (printed walls, layer bonding limits stiffness to 4);
 // PETG 1.4x (E ~2 GPa, soft: slow hobby frames only). Printed parts are solid-equivalent densities.
 export const MATERIALS = {
-  carbon:   { label: "Carbon fibre",    densityGcc: 1.6, stiffness: 10, costRel: 1.0 },
-  glass:    { label: "Glass fibre (G10)", densityGcc: 1.9, stiffness: 5, costRel: 0.35 },
-  aluminum: { label: "Aluminium",       densityGcc: 2.7, stiffness: 7,  costRel: 0.5 },
-  plastic:  { label: "Plastic (nylon/ABS)", densityGcc: 1.1, stiffness: 3, costRel: 0.2 },
-  foam:     { label: "Foam (EPO/EPP)",  densityGcc: 0.035, stiffness: 1, costRel: 0.3, frameRel: 1.2 }, // mainly VTOL / fixed wing
-  titanium: { label: "Titanium",        densityGcc: 4.5, stiffness: 10, costRel: 4.0 },
-  pacf:     { label: "3D-printed PA-CF (carbon-nylon)", densityGcc: 1.3, stiffness: 4, costRel: 0.3 },
-  petg:     { label: "3D-printed PETG", densityGcc: 1.27, stiffness: 2, costRel: 0.2 },
-  balsa:    { label: "Balsa / plywood", densityGcc: 0.2, stiffness: 3, costRel: 0.25, frameRel: 1.5 } // fixed wing and foam-like VTOL only
+  carbon:   { densityGcc: 1.6, stiffness: 10, costRel: 1.0 },
+  glass:    { densityGcc: 1.9, stiffness: 5, costRel: 0.35 },
+  aluminum: { densityGcc: 2.7, stiffness: 7,  costRel: 0.5 },
+  plastic:  { densityGcc: 1.1, stiffness: 3, costRel: 0.2 },
+  foam:     { densityGcc: 0.035, stiffness: 1, costRel: 0.3, frameRel: 1.2 }, // mainly VTOL / fixed wing
+  titanium: { densityGcc: 4.5, stiffness: 10, costRel: 4.0 },
+  pacf:     { densityGcc: 1.3, stiffness: 4, costRel: 0.3 },
+  petg:     { densityGcc: 1.27, stiffness: 2, costRel: 0.2 },
+  balsa:    { densityGcc: 0.2, stiffness: 3, costRel: 0.25, frameRel: 1.5 } // fixed wing and foam-like VTOL only
 };
+localize(MATERIALS, "mat", ["label"]);
 
 // Hardware and harness mass (g). Screws, nuts, standoffs and ties scale per motor; each ESC link is signal + power leads; each connector
 // is a plug and socket; sensors add a mount. Connectors are Pixhawk-style: GPS = JST-GH 6-pin and CAN = JST-GH 4-pin (the Pixhawk GPS and
@@ -190,20 +211,24 @@ export const HARDWARE = {
 
 // Airframe configurations for the wizard: label, total motor count, one-line explainer, family (multirotor | vtol | wing).
 export const CONFIGURATIONS = {
-  quad: { label: "Quad", motors: 4, family: "multirotor", note: "Four rotors: simplest and lightest, no motor-out redundancy." },
-  hex:  { label: "Hex",  motors: 6, family: "multirotor", note: "Six rotors: more lift, can land after losing one motor." },
-  octo: { label: "Octo", motors: 8, family: "multirotor", note: "Eight rotors: heavy lift and the most redundancy." },
-  vtol: { label: "VTOL quadplane", motors: 5, family: "vtol", note: "Four lift rotors for take-off and landing, a pusher and a wing for efficient cruise." },
-  tiltrotor: { label: "VTOL tiltrotor", motors: 4, family: "vtol", note: "Four rotors tilt from lift to cruise: no pusher, four tilt servos, a wing for cruise." },
-  fixedwing: { label: "Fixed wing", motors: 1, family: "wing", note: "One motor, wing and tail: the longest endurance, launched by hand, bungee or runway; cannot hover." }
+  quad: { motors: 4, family: "multirotor" },
+  hex:  { motors: 6, family: "multirotor" },
+  octo: { motors: 8, family: "multirotor" },
+  vtol: { motors: 5, family: "vtol" },
+  tiltrotor: { motors: 4, family: "vtol" },
+  fixedwing: { motors: 1, family: "wing" }
 };
+localize(CONFIGURATIONS, "cfg", ["label", "note"]);
 
 // Input ranges enforced by estimate(); label is used in error text.
 export const LIMITS = { targetFlightMin: [1, 180], payloadKg: [0, 25], altitudeM: [0, 6000], tempC: [-30, 50], windMs: [0, 20], budgetUsd: [0, 1e6] };
-const LABELS = { targetFlightMin: ["Flight time", "minutes"], payloadKg: ["Payload", "kg"], altitudeM: ["Altitude", "m"], tempC: ["Temperature", "°C"], windMs: ["Wind speed", "m/s"], budgetUsd: ["Budget", "USD"] };
+// Optional battery inputs (input.battery): capacity fade of an aged pack, and the hover current measured on the real build.
+export const BATTERY_LIMITS = { ageFadePct: [0, 40], measuredHoverA: [0.1, 500] };
+const LABELS = { targetFlightMin: ["engine.lim.targetFlightMin", null], payloadKg: ["engine.lim.payloadKg", "kg"], altitudeM: ["engine.lim.altitudeM", "m"], tempC: ["engine.lim.tempC", "°C"], windMs: ["engine.lim.windMs", "m/s"], budgetUsd: ["engine.lim.budgetUsd", "USD"],
+  ageFadePct: ["engine.lim.ageFadePct", "%"], measuredHoverA: ["engine.lim.measuredHoverA", "A"] }; // [label key, unit symbol; null = the word "minutes", engine.minutes]
 const rangeErr = (f, x) => {
-  const [lo, hi] = LIMITS[f];
-  return num(x) && x >= lo && x <= hi ? null : `${LABELS[f][0]} must be between ${lo} and ${hi} ${LABELS[f][1]}`;
+  const [lo, hi] = LIMITS[f] ?? BATTERY_LIMITS[f];
+  return num(x) && x >= lo && x <= hi ? null : t("engine.err.range", { label: t(LABELS[f][0]), lo, hi, unit: LABELS[f][1] ?? t("engine.minutes") });
 };
 
 const num = (x) => typeof x === "number" && Number.isFinite(x);
@@ -217,13 +242,91 @@ function airDensity(altM, tempC) {
   return p / (R_AIR * (tempC + 273.15));
 }
 
+/** Capacity and resistance multipliers of the pack from temperature (cold derate) and age fade (%). Monotonic; exactly 1 and 1 at >= 15 C and 0% fade. */
+export const batteryFactors = (tempC, agePct = 0) => {
+  const cold = Math.max(0, BATT.coldC - tempC), fade = agePct / 100;
+  return { cap: (1 - BATT.capPerC * cold) * (1 - fade), res: (1 + BATT.rPerC * cold) * (1 + BATT.ageR * fade) };
+};
+/** Pack resistance (ohm) of `cells` series cells on a pack of `ah` Ah; resF = the batteryFactors().res multiplier. */
+export const packOhm = (chem, cells, ah, resF = 1) => (BATT.rAh[chem] * cells * resF) / ah;
+/** Loaded cell voltage (V) at `amps`: nominal cell volts - amps x pack resistance / cells. */
+export const loadedCellV = (chem, cells, ah, resF, amps) => VCELL[chem] - (amps * packOhm(chem, cells, ah, resF)) / cells;
+// Energy factor of the extra resistive loss of a cold or aged pack at draw p (W) vs a new warm one: (1 - loss) / (1 - loss0), loss = p R / V^2 (first order).
+// The engine's drivetrain efficiency already holds the new-pack loss, so only the change counts. Exactly 1 when the resistance is unchanged.
+const drawEff = (c, k, wh, p) => {
+  if (c.rF === 1) return 1;
+  const l0 = Math.min(0.45, (p * packOhm(c.liion ? "liion" : "lipo", k.cells, wh / k.vnom)) / (k.vnom * k.vnom));
+  return (1 - Math.min(0.5, l0 * c.rF)) / (1 - l0);
+};
+
+// v6 measured thrust curve: thrust-stand data for ONE motor + prop (throttle %, thrust g, current A, volts at that load; optional rpm and electrical watts).
+// Points rise with throttle: throttle strictly, thrust and current never fall; 3 to 50 of them. The engine scales it by the motor count (and the air density, like the
+// rated thrust) and uses it instead of the model for hover current, full-throttle thrust and current, T:W and flight time. The pack and parts are still sized by the model.
+export const CURVE_LIMITS = { points: [3, 50], pct: [0, 100], thrustG: [0, 100000], currentA: [0, 500], voltageV: [1, 100], rpm: [0, 200000], powerW: [0, 50000] };
+const CURVE_REQ = ["pct", "thrustG", "currentA", "voltageV"], CURVE_OPT = ["rpm", "powerW"];
+/** Validate and rebuild a curve from anything (a form, storage): -> { curve: { name, points } } or { error }. Only the known numeric fields survive. */
+export function curveOf(raw) {
+  const bad = (error) => ({ error }), [lo, hi] = CURVE_LIMITS.points;
+  const pts = raw && typeof raw === "object" && Array.isArray(raw.points) ? raw.points : null;
+  if (!pts) return bad(t("engine.curve.list"));
+  if (pts.length < lo || pts.length > hi) return bad(t("engine.curve.count", { lo, hi, n: pts.length }));
+  const out = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i], q = {};
+    if (!p || typeof p !== "object") return bad(t("engine.curve.notPoint", { i: i + 1 }));
+    for (const k of [...CURVE_REQ, ...CURVE_OPT]) {
+      const v = p[k];
+      if (v === undefined || v === null) { if (CURVE_REQ.includes(k)) return bad(t("engine.curve.missing", { i: i + 1, k })); continue; }
+      const [a, b] = CURVE_LIMITS[k];
+      if (!num(v) || v < a || v > b) return bad(t("engine.curve.range", { i: i + 1, k, lo: a, hi: b }));
+      q[k] = v;
+    }
+    const w = out[i - 1];
+    if (w && !(q.pct > w.pct)) return bad(t("engine.curve.rise", { i: i + 1 }));
+    if (w && (q.thrustG < w.thrustG || q.currentA < w.currentA)) return bad(t("engine.curve.fall", { i: i + 1 }));
+    out.push(q);
+  }
+  if (!(out[out.length - 1].thrustG > 0)) return bad(t("engine.curve.none"));
+  return { curve: { name: typeof raw.name === "string" ? raw.name.replace(/[\x00-\x1f\x7f-\x9f]/g, "").trim().slice(0, 60) : "", points: out } };
+}
+const cpick = (p) => ({ pct: p.pct, thrustG: p.thrustG, currentA: p.currentA, voltageV: p.voltageV });
+/** Linear interpolation at throttle pct (clamped to the curve's ends): { pct, thrustG, currentA, voltageV }. pts = curveOf().curve.points. */
+export function curveAtPct(pts, pct) {
+  const x = Math.min(pts[pts.length - 1].pct, Math.max(pts[0].pct, pct));
+  let i = 1;
+  while (i < pts.length - 1 && pts[i].pct < x) i++;
+  const a = pts[i - 1], b = pts[i], t = (x - a.pct) / (b.pct - a.pct), L = (u, v) => u + (v - u) * t;
+  return { pct: x, thrustG: L(a.thrustG, b.thrustG), currentA: L(a.currentA, b.currentA), voltageV: L(a.voltageV, b.voltageV) };
+}
+/** The inverse: the point where the curve gives thrust g (one motor): { pct, thrustG, currentA, voltageV, over } with over = g is beyond the curve's maximum (then the last point). */
+export function curveAtThrust(pts, g) {
+  const first = pts[0], last = pts[pts.length - 1];
+  if (g >= last.thrustG) return { ...cpick(last), over: g > last.thrustG };
+  if (g <= first.thrustG) return { ...cpick(first), over: false };
+  let i = 1;
+  while (pts[i].thrustG < g) i++; // ends: the last point is above g
+  const a = pts[i - 1], b = pts[i], t = (g - a.thrustG) / (b.thrustG - a.thrustG), L = (u, v) => u + (v - u) * t; // a < g <= b, so b > a
+  return { pct: L(a.pct, b.pct), thrustG: g, currentA: L(a.currentA, b.currentA), voltageV: L(a.voltageV, b.voltageV), over: false };
+}
+// The curve's figures for the converged build r: all N motors at full throttle and, for a hovering airframe, at the hover thrust (sea-level equivalent: the curve is
+// rated like the model's thrust). Pack current = N x motor current + avionics. A fixed wing has no hover: only the full-throttle figures.
+function measuredFigures(c, m, r, N, dr, fw) {
+  const P = c.curve.points, last = P[P.length - 1], k = r.k, o = { name: c.curve.name, points: P.length, motors: N, maxThrustG: N * last.thrustG, maxCurrentA: N * last.currentA,
+    peakA: N * last.currentA + m.avionicsW / k.vnom, standV: last.voltageV, hoverPct: null, hoverPackA: null, hoverMotorG: null, overCapacity: false };
+  if (!fw) {
+    const need = (r.auw * 1000 * (k.vt ? VT.download : 1)) / N / dr, h = curveAtThrust(P, need);
+    Object.assign(o, { hoverMotorG: need, hoverPct: h.pct, hoverMotorA: h.currentA, hoverPackA: N * h.currentA + m.avionicsW / k.vnom, overCapacity: h.over });
+  }
+  return o;
+}
+
 function validate(input) {
   const errors = [];
-  if (!input || typeof input !== "object") return { errors: ["input must be an object"] };
-  if (!Object.hasOwn(MISSIONS, input.mission)) errors.push("mission must be one of: " + Object.keys(MISSIONS).join(", "));
+  if (!input || typeof input !== "object") return { errors: [t("engine.err.input")] };
+  if (!Object.hasOwn(MISSIONS, input.mission)) errors.push(t("engine.err.mission", { list: Object.keys(MISSIONS).join(", ") }));
   { const e = rangeErr("targetFlightMin", input.targetFlightMin); if (e) errors.push(e); }
-  if (!Object.hasOwn(MATERIALS, input.frameMaterial)) errors.push("frameMaterial must be one of: " + Object.keys(MATERIALS).join(", "));
-  if (!Object.hasOwn(NMOT, input.configuration)) errors.push("configuration must be one of: " + Object.keys(NMOT).join(", "));
+  if (!Object.hasOwn(MATERIALS, input.frameMaterial)) errors.push(t("engine.err.material", { list: Object.keys(MATERIALS).join(", ") }));
+  if (!Object.hasOwn(NMOT, input.configuration)) errors.push(t("engine.err.config", { list: Object.keys(NMOT).join(", ") }));
   const m = MISSIONS[input.mission];
   let payload = input.payloadKg;
   if (payload === undefined || payload === null || payload === "") payload = m ? m.defaultPayloadKg : 0;
@@ -234,16 +337,26 @@ function validate(input) {
   let budget = input.budgetUsd;
   if (budget === undefined || budget === null || budget === "") budget = null;
   else { const e = rangeErr("budgetUsd", budget); if (e) errors.push(e); }
+  // optional battery inputs: absent / null / "" = not set (age 0, no calibration)
+  const bi = input.battery ?? {}, unset = (x) => x === undefined || x === null || x === "";
+  const age = unset(bi.ageFadePct) ? 0 : bi.ageFadePct, measA = unset(bi.measuredHoverA) ? null : bi.measuredHoverA;
+  { const e = rangeErr("ageFadePct", age); if (e) errors.push(e); }
+  if (measA !== null) { const e = rangeErr("measuredHoverA", measA); if (e) errors.push(e); }
+  // optional measured thrust curve (v6): absent / null = the model
+  let curve = null;
+  if (input.thrustCurve !== undefined && input.thrustCurve !== null) { const v = curveOf(input.thrustCurve); if (v.error) errors.push(t("engine.err.curve", { error: v.error })); else curve = v.curve; }
   if (errors.length) return { errors };
+  const bf = batteryFactors(env.tempC, age);
   // fpv: size class (missing/invalid -> "5", no error) and always a quad
   const fpv = input.mission === "fpv", fpvClass = fpv ? (Object.hasOwn(FPV_CLASSES, String(input.fpvClass)) ? String(input.fpvClass) : "5") : null;
   let config = input.configuration;
   const pre = [];
   if (fpv && config !== "quad") {
-    pre.push(`${CONFIGURATIONS[config].label} does not suit FPV flying (agility, punch-outs, crash-tolerant frames): the build uses a quad.`);
+    pre.push(t("warn.fpvConfig", { config: CONFIGURATIONS[config].label }));
     config = "quad";
   }
-  return { errors, cfg: { mission: input.mission, target: input.targetFlightMin, payload, material: input.frameMaterial, config, env, budget, fpvClass, pre } };
+  return { errors, cfg: { mission: input.mission, target: input.targetFlightMin, payload, material: input.frameMaterial, config, env, budget, fpvClass, pre,
+    age, measA, cap: bf.cap, rF: bf.res, curve } };
 }
 
 const snapProp = (inch) => PROPS.reduce((a, b) => (Math.abs(b - inch) < Math.abs(a - inch) ? b : a));
@@ -334,7 +447,7 @@ function comps(c, m, N, rho, auw, lockInch) {
   const CL = inch >= 12 ? CELLS.filter((s) => s !== 8) : CELLS;
   let ci = CL.findIndex((s) => s >= Math.max(m.minCells ?? (inch >= 12 ? 6 : 4), perMotorW / div)); // 12in+ lift motors are 6S+ in practice; FPV classes 6S
   if (ci < 0) ci = CL.length - 1;
-  const capI = c.payload > 1 || !m.maxCells ? CL.length - 1 : CL.findLastIndex((s) => s <= m.maxCells);
+  const capI = c.payload > 1 || !m.maxCells ? CL.length - 1 : CL.filter((s) => s <= m.maxCells).length - 1; // CL is ascending; findLastIndex needs Chrome 97 / Safari 15.4
   ci = Math.min(ci, capI);
   const vcell = c.liion ? VCELL.liion : VCELL.lipo;
   while (ci < capI && perMotorW / (CL[ci] * vcell) > ampLimit) ci++;
@@ -401,7 +514,7 @@ function fwComps(c, m, rho, auw, lock) {
   vt.tw = Math.ceil((100 * cruiseT(T0, inch, cruiseW, rho)) / W - 1e-6) / 100; // static T:W, raised for a fast wing so the motor can draw cruise power
   const T = vt.tw * W, thrustG = ((T / G) * 1000) / rr, thrustG0 = ((T0 / G) * 1000) / rr; // static thrust, rated at sea level
   const fullW = rotorW(T, 1, inch, rho) * 1.1; // full-throttle static electrical power, +10% droop
-  const vcell = c.liion ? VCELL.liion : VCELL.lipo, capI = c.payload > 1 || !m.maxCells ? CELLS.length - 1 : CELLS.findLastIndex((s) => s <= m.maxCells);
+  const vcell = c.liion ? VCELL.liion : VCELL.lipo, capI = c.payload > 1 || !m.maxCells ? CELLS.length - 1 : CELLS.filter((s) => s <= m.maxCells).length - 1;
   let ci = CELLS.findIndex((s) => s >= FW.minCells && fullW / (s * vcell) <= FW.packA);
   ci = Math.min(ci < 0 ? CELLS.length - 1 : ci, capI);
   const cells = CELLS[ci], vnom = cells * vcell, amps = fullW / vnom;
@@ -431,48 +544,53 @@ function harness(c, m, k) {
   const amps = Math.max((vt ? k.hoverPowerW : k.avgPowerW) / k.vnom, Math.round(k.peakCurrentA) / (fpv ? 3 : 1.5)); // rounded like result.peakCurrentA
   const plug = amps <= 30 && !fpv ? "XT30" : amps <= 60 ? "XT60" : amps <= 90 ? "XT90" : "AS150"; // FPV 5-10in packs ship XT60
   const rows = [
-    fpv ? { name: "ESC signal", connector: `${jst} 8-pin (4-in-1 ESC: 4 x DShot, current, telemetry)`, count: 1, lengthMm: 40 }
-      : { name: "ESC signal", connector: `${jst} 3-pin (PWM/DShot)`, count: motors, lengthMm: arm },
-    fpv ? { name: "ESC power", connector: "solder pads, 4-in-1 ESC to battery lead", count: 1, lengthMm: 40 }
-      : { name: "ESC power", connector: "solder pads, 14 AWG silicone pair", count: motors, lengthMm: arm },
-    fpv && { name: "Motor leads", connector: "soldered to 4-in-1 ESC pads", count: motors, lengthMm: arm },
-    { name: "FC link", connector: `${jst} (FC main harness)`, count: 1, lengthMm: 150 },
-    gps && { name: "GPS", connector: "JST-GH 6-pin (Pixhawk GPS port)", count: gps, lengthMm: 200 },
-    vt && { name: "CAN", connector: "JST-GH 4-pin (DroneCAN: CAN_H, CAN_L, 5 V, GND)", count: 1, lengthMm: 300 },
-    { name: "RX (SBUS)", connector: `${jst} 3-pin (SBUS)`, count: 1, lengthMm: 150 },
-    cam === "fpv" && { name: "VTX", connector: `${jst} 4-pin (serial, 5 V, GND)`, count: 1, lengthMm: 120 },
-    cam && { name: "Camera", connector: cam === "fpv" ? `${jst} 4-pin (video, 5 V, GND)` : "JST-GH 6-pin (gimbal power and serial)", count: 1, lengthMm: 200 },
-    { name: "Battery", connector: plug, count: 1, lengthMm: 150 },
-    { name: "Buzzer / LED", connector: `${jst} 2-pin (buzzer), 4-pin (LED)`, count: 1, lengthMm: 150 },
-    servos && { name: "Servo leads", connector: `${jst} 3-pin (FC) to 3-pin servo`, count: servos, lengthMm: arm }
+    fpv ? { id: "escSignal", name: t("wire.e.escSignal.name"), connector: t("wire.e.escSignal.connFpv", { jst }), count: 1, lengthMm: 40 }
+      : { id: "escSignal", name: t("wire.e.escSignal.name"), connector: t("wire.e.escSignal.conn", { jst }), count: motors, lengthMm: arm },
+    fpv ? { id: "escPower", name: t("wire.e.escPower.name"), connector: t("wire.e.escPower.connFpv"), count: 1, lengthMm: 40 }
+      : { id: "escPower", name: t("wire.e.escPower.name"), connector: t("wire.e.escPower.conn"), count: motors, lengthMm: arm },
+    fpv && { id: "motorLeads", name: t("wire.e.motorLeads.name"), connector: t("wire.e.motorLeads.conn"), count: motors, lengthMm: arm },
+    { id: "fcLink", name: t("wire.e.fcLink.name"), connector: t("wire.e.fcLink.conn", { jst }), count: 1, lengthMm: 150 },
+    gps && { id: "gps", name: t("wire.e.gps.name"), connector: t("wire.e.gps.conn"), count: gps, lengthMm: 200 },
+    vt && { id: "can", name: t("wire.e.can.name"), connector: t("wire.e.can.conn"), count: 1, lengthMm: 300 },
+    { id: "rx", name: t("wire.e.rx.name"), connector: t("wire.e.rx.conn", { jst }), count: 1, lengthMm: 150 },
+    cam === "fpv" && { id: "vtx", name: t("wire.e.vtx.name"), connector: t("wire.e.vtx.conn", { jst }), count: 1, lengthMm: 120 },
+    cam && { id: "camera", name: t("wire.e.camera.name"), connector: cam === "fpv" ? t("wire.e.camera.connFpv", { jst }) : t("wire.e.camera.conn"), count: 1, lengthMm: 200 },
+    { id: "battery", name: t("wire.e.battery.name"), connector: plug, count: 1, lengthMm: 150 },
+    { id: "buzzer", name: t("wire.e.buzzer.name"), connector: t("wire.e.buzzer.conn", { jst }), count: 1, lengthMm: 150 },
+    servos && { id: "servo", name: t("wire.e.servo.name"), connector: t("wire.e.servo.conn", { jst }), count: servos, lengthMm: arm }
   ].filter(Boolean);
   // ESC links priced per link; motor leads come with the motors; battery connector priced on its own
-  const jstPairs = rows.filter((r) => !r.name.startsWith("ESC") && r.name !== "Motor leads" && r.name !== "Battery").reduce((a, r) => a + r.count, 0);
+  const jstPairs = rows.filter((r) => !r.id.startsWith("esc") && r.id !== "motorLeads" && r.id !== "battery").reduce((a, r) => a + r.count, 0);
   const batteryG = { XT30: H.xt30G, XT60: H.xt60G, XT90: H.xt90G, AS150: H.as150G }[plug];
   const hardwareG = motors * (H.boltG + H.standoffG + H.tieG) + escLinks * H.escLinkG + (gps + (vt ? 1 : 0)) * H.sensorG
     + jstPairs * H.pairG + batteryG + H.harnessG;
-  return { hardwareG, wiring: rows.map(({ name, connector, count, lengthMm }) => ({ name, connector, count, lengthMm })) };
+  return { hardwareG, wiring: rows.map(({ id, name, connector, count, lengthMm }) => ({ id, name, connector, count, lengthMm })) };
 }
 
 /** Flight time of hardware k at mass auw (kg) on a pack of wh. vtol: hover/transition profile + cruise at V (default: design cruise).
  *  fixedwing: launch, climb, cruise, loiter (best-endurance speed), descent; with V given, all en-route time is cruise at V. */
 function flight(c, m, k, rho, auw, wh, V) {
   const W = auw * G, wind = 1 + 0.004 * c.env.windMs * c.env.windMs; // extra power from headwind / tilt while hovering
-  const E = wh * USABLE * (1 - m.reserve) * 3600; // J for the flight; the reserve stays in the pack
-  if (!k.vt) { const avg = rotorW(W, k.N, k.inch, rho) * m.powerMult * wind + m.avionicsW; return { flightMin: E / avg / 60, avg }; }
+  const E0 = wh * USABLE * (1 - m.reserve) * 3600; // J for the flight; the reserve stays in the pack
+  // v5: E = E0 x capacity factor (cold, age) x change in resistive loss at the sustained draw p (model watts) / kap. A calibrated hover current scales every
+  // power by kap, and flight time is linear in E / power, so E / kap at model powers is the same flight time. eK is that factor (1 with no cold, age or
+  // calibration); the performance sweeps reuse it, and kap scales the powers back for display (avg, profile).
+  const kap = c.kappa ?? 1, ek = (p) => (c.cap * drawEff(c, k, wh, p * kap)) / kap;
+  if (!k.vt) { const avg = rotorW(W, k.N, k.inch, rho) * m.powerMult * wind + m.avionicsW, eK = ek(avg); return { flightMin: (E0 * eK) / avg / 60, avg: avg * kap, eK, kap }; }
   const vt = k.vt, Vc = V ?? Math.max(vt.cruise, VT.minVs * stallMs(W, vt, rho)), cr = wingW(Vc, W, vt, rho) + m.avionicsW;
   if (vt.fw) {
+    const eK = ek(cr), E = E0 * eK;
     const Vl = V ?? bestSpeeds(c, m, k, rho, W).enduranceMs, lo = wingW(Vl, W, vt, rho) + m.avionicsW;
     const pL = k.fullW + m.avionicsW, pc = cr + (W * FW.climbMs) / vt.eta, pd = m.avionicsW + FW.descP * (cr - m.avionicsW);
     const fixS = FW.launchS + FW.climbS + FW.descS, fixJ = FW.launchS * pL + FW.climbS * pc + FW.descS * pd;
     const sc = Math.min(1, E / fixJ), rest = Math.max(0, E - fixJ), lf = V === undefined ? FW.loiter[c.mission] ?? FW.loiterDef : 0;
     const cruiseS = (rest * (1 - lf)) / cr, loiterS = (rest * lf) / lo, t = fixS * sc + cruiseS + loiterS;
-    return { flightMin: t / 60, avg: E / t, cr, lo, pL, pc, pd, Vc, Vl, sc, cruiseS, loiterS };
+    return { flightMin: t / 60, avg: (E / t) * kap, cr, lo, pL, pc, pd, Vc, Vl, sc, cruiseS, loiterS, eK, kap };
   }
-  const hov = rotorW(W * VT.download, 4, k.inch, rho) * wind + m.avionicsW, tr = hov * vt.transP;
+  const hov = rotorW(W * VT.download, 4, k.inch, rho) * wind + m.avionicsW, tr = hov * vt.transP, eK = ek(hov), E = E0 * eK;
   const fixS = 2 * (VT.hoverS + vt.transS), fixJ = 2 * (VT.hoverS * hov + vt.transS * tr);
   const sc = Math.min(1, E / fixJ), cruiseS = Math.max(0, E - fixJ) / cr, t = fixS * sc + cruiseS; // sc < 1: pack too small for the profile
-  return { flightMin: t / 60, avg: E / t, hov, tr, cr, Vc, sc, cruiseS };
+  return { flightMin: t / 60, avg: (E / t) * kap, hov, tr, cr, Vc, sc, cruiseS, eK, kap };
 }
 
 function build(c, m, N, rho, mb, lock, chem) {
@@ -503,7 +621,7 @@ export function estimate(input) {
     if (v.errors.length) return { ok: false, errors: v.errors };
     return solve(v.cfg);
   } catch (err) {
-    return { ok: false, errors: ["internal error: " + (err && err.message)] };
+    return { ok: false, errors: [t("engine.err.internal", { message: err && err.message })] };
   }
 }
 
@@ -519,14 +637,14 @@ function cameraReq(mission, m, payloadKg) {
 
 /** result.performance: sweeps around the converged build with its hardware fixed (motors, props, wing, pusher). */
 function performance(c, m, k, rho, r, chem) {
-  const W = r.auw * G, w = c.env.windMs, vt = k.vt, E = r.wh * USABLE * (1 - m.reserve) * 3600;
-  const fly = (auw, wh, V) => flight(c, m, k, rho, auw, wh, V), f0 = r.f, best = bestSpeeds(c, m, k, rho, W);
+  const W = r.auw * G, w = c.env.windMs, vt = k.vt, f0 = r.f, kap = f0.kap, E = r.wh * USABLE * (1 - m.reserve) * 3600 * f0.eK; // E, sweep powers: model scale, x kap shown
+  const fly = (auw, wh, V) => flight(c, m, k, rho, auw, wh, V), best = bestSpeeds(c, m, k, rho, W);
   const fw = !!vt?.fw; // fixed wing: speed stall..1.8x cruise; throttle = the cruise motor's static thrust
   const speed = (vt ? lin(stallMs(W, vt, rho), (fw ? 1.8 : 1.6) * f0.Vc, 16) : lin(0, Math.max(1.6 * m.cruiseMs, 1.2 * best.rangeMs), 16)).map((V) => {
     let p, t, cs;
     if (vt) { const f = fly(r.auw, r.wh, V); p = f.cr; t = f.flightMin; cs = f.cruiseS; }
     else { p = mrW(V, W, k, rho) + m.avionicsW; t = E / p / 60; cs = t * 60; } // steady level flight, still-air power
-    return { ms: r2(V), powerW: r1(p), currentA: r2(p / k.vnom), flightMin: r2(t), rangeKm: r2((gs(V, w) * cs) / 1000) };
+    return { ms: r2(V), powerW: r1(p * kap), currentA: r2((p * kap) / k.vnom), flightMin: r2(t), rangeKm: r2((gs(V, w) * cs) / 1000) };
   });
   const tmaxG = k.thrustPerMotorG * k.N * (rho / RHO0); // (lift / fixed-wing static) thrust available at this air density, g
   const payload = lin(0, Math.max(1.5 * c.payload, 0.5), 11).map((kg) => {
@@ -554,7 +672,7 @@ function performance(c, m, k, rho, r, chem) {
     const p = ph * ((1 - MOTOR_IDLE) * Math.pow(T / thG, 1.5) + MOTOR_IDLE) * (1 + 0.1 * Math.max(0, (x - xh) / (1 - xh)));
     return { pct, thrustG: Math.round(T), powerW: r1(p), currentA: r2(p / k.vnom), gPerW: r2(T / p) };
   });
-  const resJ = r.wh * USABLE * m.reserve * 3600; // reserve energy, shown as extra time at loiter (vtol cruise) or hover power
+  const resJ = r.wh * USABLE * m.reserve * 3600 * f0.eK; // reserve energy, shown as extra time at loiter (vtol cruise) or hover power
   let seq;
   if (fw) seq = [["launch", FW.launchS * f0.sc, f0.pL], ["climb", FW.climbS * f0.sc, f0.pc], ["cruise", f0.cruiseS, f0.cr],
     ["loiter", f0.loiterS, f0.lo], ["descent", FW.descS * f0.sc, f0.pd], ["reserve", resJ / f0.cr, f0.cr]];
@@ -566,14 +684,14 @@ function performance(c, m, k, rho, r, chem) {
       ["landing", ts, pLd], ["reserve", resJ / hov, hov]]; // middle-phase power keeps total energy = usable energy
   }
   let at = 0;
-  const profile = seq.map(([phase, d, p]) => { const o = { phase, startS: r1(at), durationS: r1(d), powerW: r1(p) }; at += d; return o; });
+  const profile = seq.map(([phase, d, p]) => { const o = { phase, startS: r1(at), durationS: r1(d), powerW: r1(p * kap) }; at += d; return o; });
   return { speed, payload, battery, batteryBest, throttle, profile, bestSpeed: { enduranceMs: r2(best.enduranceMs), rangeMs: r2(best.rangeMs) } };
 }
 
 // Li-ion C limits: continuous ~10C (21700 high-drain cells: 45 A on 4.2-4.5 Ah), bursts ~20C for a few seconds; continuous draw
 // gets a 1.25 margin. Sustained draw = flight average (multirotor), hover phase (VTOL) or climb (fixed wing).
 const LIION = { contC: 10, burstC: 20, margin: 1.25, minC: 2 };
-const contA = (r) => (r.k.vt?.fw ? r.f.pc : r.k.vt ? r.f.hov : r.f.avg) / r.k.vnom;
+const contA = (r) => (r.k.vt?.fw ? r.f.pc * r.f.kap : r.k.vt ? r.f.hov * r.f.kap : r.f.avg) / r.k.vnom; // kap: hover calibration (1 when off)
 const liionAh = (r) => Math.max((LIION.margin * contA(r)) / LIION.contC, r.k.peakCurrentA / LIION.burstC); // smallest pack (Ah) the cells allow
 
 /** Battery-mass iteration until flight time hits the target (best effort, capped). Returns the best build. */
@@ -622,29 +740,53 @@ function solve(c) {
     const mb = packKg((hl / 1000) * r.k.vnom, chem), r2 = build(c, m, N, rho, mb, lock ?? { inch: r.k.inch, pInch: r.k.vt?.pusher?.propInch }, chem);
     if (r2.k.cells === r.k.cells && mb <= (MAX_BATT_FRAC * (r2.auw - mb)) / (1 - MAX_BATT_FRAC)) r = r2;
   }
-  const k = r.k, f = r.f, vt = k.vt;
+  // v5 hover calibration: factor = measured hover current / predicted (engine hover power at nominal volts). The pack stays as sized; its power, current and
+  // flight time rescale by the factor. A wing has no hover: its level-cruise current is the one to measure.
+  const predA = r.k.hoverPowerW / r.k.vnom, uncalMin = r.flightMin;
+  // v6: with a measured thrust curve the hover current comes from it; an explicit measured hover current (ha) on the real build beats the curve's. Either way the factor is limited to KAPPA.
+  const dr = rho / RHO0, mcv = c.curve ? measuredFigures(c, m, r, N, dr, fwc) : null, measA = c.measA !== null ? c.measA : mcv?.hoverPackA ?? null;
+  const kRaw = measA === null ? 1 : measA / predA, kLim = kRaw < KAPPA[0] ? 1 : Math.min(KAPPA[1], kRaw), src = c.measA !== null ? "hover" : "curve";
+  if (measA !== null) { c.kappa = kLim; const f2 = flight(c, m, r.k, rho, r.auw, r.wh); r = { ...r, f: f2, flightMin: f2.flightMin }; }
+  const k = r.k, f = r.f, vt = k.vt, peakA = mcv ? mcv.peakA : k.peakCurrentA; // peakA: full-throttle pack current, the curve's when there is one
   const meetsTarget = r.flightMin >= c.target * 0.99;
   const cruiseMs = vt ? f.Vc : m.cruiseMs;
 
-  const warnings = [...c.pre];
-  if (!meetsTarget) warnings.push(`Target ${c.target} min is not reachable with this setup: the maximum reachable flight time is ~${r1(r.flightMin)} min (typical ${m.label} range is up to ${m.maxFlightMin} min; battery limited to ${MAX_BATT_FRAC * 100}% of AUW). Try less payload, a larger configuration (hex/octo) or a lower target.`);
-  if (c.config === "quad" && c.payload > 3) warnings.push("Quad with >3 kg payload has no motor-out redundancy; consider hex or octo.");
-  if (vfam && c.mission === "interceptor") warnings.push(`A ${CONFIGURATIONS[c.config].label} does not suit ${m.label}: about 2:1 lift thrust, slow transitions and low agility. Use a quad for this mission.`);
-  if (fwc && c.mission === "inspection") warnings.push("A fixed wing cannot hover: inspection that needs hover or close orbits suits a multirotor or a VTOL.");
-  if (fwc && c.mission === "interceptor") warnings.push("A fixed-wing interceptor is fast but cannot hover and turns wide; it needs space to launch and recover.");
-  if (fwc && (c.mission === "delivery" || c.mission === "agriculture")) warnings.push(`A fixed wing cannot hover for ${m.label.toLowerCase()}: it needs a parachute or air drop and a landing strip or net.`);
-  if (fam === "multirotor" && c.material === "foam") warnings.push("Foam (EPO/EPP) suits VTOL and fixed-wing airframes; a foam multirotor frame flexes and needs embedded carbon spars.");
-  if (fam === "multirotor" && c.material === "balsa") warnings.push("Balsa/plywood suits fixed-wing and foam-like VTOL wings only: a balsa multirotor frame breaks in a crash. Use carbon, PA-CF or glass.");
-  if (c.material === "titanium" && (fam !== "multirotor" || c.mission === "fpv")) warnings.push(`Titanium weighs ${r1(matFactor(MATERIALS.titanium))}x carbon for the same stiffness: it suits heavy-duty multirotors only. Use carbon or PA-CF.`);
-  if (c.material === "petg" && (c.mission === "fpv" || c.mission === "interceptor")) warnings.push("PETG softens near hot motors and flexes under punch-outs: too soft for FPV or interceptor flying. Use carbon or PA-CF.");
-  if (c.liion && k.peakCurrentA / (r.mah / 1000) > LIION.contC) warnings.push(`Full-throttle draw is ${Math.round(k.peakCurrentA / (r.mah / 1000))}C: within high-drain Li-ion burst limits (~20C) for a few seconds only; keep full throttle short.`);
-  if (rho / RHO0 < 0.8) warnings.push(`Thin/hot air (density ${r2(rho / RHO0)} of sea level): motors are rated ${Math.round((RHO0 / rho - 1) * 100)}% higher thrust than the TWR you will see.`);
-  if (env.windMs > 0.5 * cruiseMs) warnings.push("Wind exceeds half of cruise speed: range and safety margin are strongly reduced.");
-  if (vfam && env.windMs > VT.hoverWindMs) warnings.push(`Wind above ${VT.hoverWindMs} m/s: hover take-off and landing with a large wing is marginal (typical VTOL limit 8-12 m/s).`);
-  if (r.auw > 25) warnings.push("AUW above 25 kg: heavy-UAS regulations apply in most countries.");
-  else if (r.auw > 0.25) warnings.push("AUW above 250 g: registration is required in most countries.");
-  if (k.statorMax < k.thrustPerMotorG) warnings.push("Required thrust per motor exceeds common motor sizes; use more motors or a larger configuration.");
-  if (k.cells >= 14) warnings.push("Very high voltage (14S); check ESC and motor voltage ratings.");
+  // wids: the id of each warning, in step with warnings (result.warningIds), so the page can find one without reading its text (text: warn.<id>).
+  const warnings = [...c.pre], wids = c.pre.map(() => "fpvConfig");
+  const warn = (id, params) => { warnings.push(t("warn." + id, params)); wids.push(id); };
+  if (!meetsTarget && measA !== null) warn("measuredShort", { src: t("warn.src." + src), kappa: r2(c.kappa), min: r1(r.flightMin), target: c.target });
+  else if (!meetsTarget) warn("unreachable", { target: c.target, min: r1(r.flightMin), mission: m.label, max: m.maxFlightMin, pct: MAX_BATT_FRAC * 100 });
+  if (c.config === "quad" && c.payload > 3) warn("quadPayload");
+  if (vfam && c.mission === "interceptor") warn("vtolInterceptor", { config: CONFIGURATIONS[c.config].label, mission: m.label });
+  if (fwc && c.mission === "inspection") warn("wingInspection");
+  if (fwc && c.mission === "interceptor") warn("wingInterceptor");
+  if (fwc && (c.mission === "delivery" || c.mission === "agriculture")) warn("wingHover", { mission: m.label.toLowerCase() });
+  if (fam === "multirotor" && c.material === "foam") warn("matFoam");
+  if (fam === "multirotor" && c.material === "balsa") warn("matBalsa");
+  if (c.material === "titanium" && (fam !== "multirotor" || c.mission === "fpv")) warn("matTitanium", { x: r1(matFactor(MATERIALS.titanium)) });
+  if (c.material === "petg" && (c.mission === "fpv" || c.mission === "interceptor")) warn("matPetg");
+  if (c.liion && peakA / (r.mah / 1000) > LIION.contC) warn("liionDraw", { c: Math.round(peakA / (r.mah / 1000)) });
+  if (rho / RHO0 < 0.8) warn("thinAir", { density: r2(rho / RHO0), pct: Math.round((RHO0 / rho - 1) * 100) });
+  if (env.windMs > 0.5 * cruiseMs) warn("windHalf");
+  if (vfam && env.windMs > VT.hoverWindMs) warn("windVtol", { ms: VT.hoverWindMs });
+  if (r.auw > 25) warn("auwHeavy");
+  else if (r.auw > 0.25) warn("auwReg");
+  if (k.statorMax < k.thrustPerMotorG) warn("statorMax");
+  if (k.cells >= 14) warn("highVoltage");
+  if (kRaw !== kLim) warn(kLim === 1 ? "measuredMismatchKept" : "measuredMismatchLimit", { src: t("warn.src." + src), kraw: r2(kRaw), pred: r1(predA), limit: kLim });
+  // v5 battery: sag at the hover draw (calibrated) and at full throttle (engine peak current), loaded cell volts against the chemistry floor.
+  // Hover breaches always warn; a full-throttle breach warns only when the cold, age or calibration derate causes it (a new warm pack would clear the floor).
+  const bAh = r.mah / 1000, bKap = f.kap, hoverA = (k.hoverPowerW * bKap) / k.vnom, maxA = peakA, floorV = BATT.floor[chem];
+  const hoverV = loadedCellV(chem, k.cells, bAh, c.rF, hoverA), maxV = loadedCellV(chem, k.cells, bAh, c.rF, maxA), maxV0 = loadedCellV(chem, k.cells, bAh, 1, maxA);
+  const hoverW = hoverV < floorV && t("warn.sagHover", { v: r2(hoverV), floor: floorV }),
+    maxW = maxV < floorV && t("warn.sagMax", { v: r2(maxV), floor: floorV });
+  if (hoverW) { warnings.push(hoverW); wids.push("sagHover"); }
+  if (maxV0 >= floorV && maxW) { warnings.push(maxW); wids.push("sagMax"); }
+  if (mcv) {
+    if (mcv.overCapacity) warn("curveOver", { hover: Math.round(mcv.hoverMotorG), peak: Math.round(mcv.maxThrustG / N), n: N });
+    if (Math.abs(mcv.standV / k.vnom - 1) > 0.25) warn("curveVolt", { standV: r1(mcv.standV), vnom: r1(k.vnom), cells: k.cells });
+    if (fwc) warn("curveWing");
+  }
 
   // Rough parts-cost model (USD) used only for the budget warning; matcher gives real prices.
   const mat = MATERIALS[c.material];
@@ -658,15 +800,16 @@ function solve(c) {
     (vt ? 15 * vt.servoCount + 40 : 0) + // control servos, airspeed sensor
     (vt?.pusher && !fwc ? 15 + 0.03 * vt.pusher.thrustG + 0.25 * vt.pusher.escA : 0) + // quadplane pusher + ESC (fixed wing: in N terms)
     (tilt ? 4 * 30 : 0)); // tilt servos and brackets
-  if (c.budget !== null && estCostUsd > c.budget) warnings.push(`Estimated core parts cost ~$${estCostUsd} exceeds budget $${Math.round(c.budget)}.`);
+  if (c.budget !== null && estCostUsd > c.budget) warn("budget", { cost: estCostUsd, budget: Math.round(c.budget) });
 
   // fixed wing: cruise throttle = sqrt(cruise thrust / static thrust); cruise thrust = cruise propulsion power x eta / V
-  const hoverThrottle = fwc ? 100 * Math.sqrt(Math.min(1, ((f.cr - m.avionicsW) * vt.eta) / f.Vc / ((k.thrustPerMotorG / 1000) * G * (rho / RHO0))))
-    : 100 * Math.sqrt(vt ? VT.download / VT.liftTWR : 1 / m.minTWR);
-  const maxThrustG = k.thrustPerMotorG * N;
+  const hoverThrottle = mcv?.hoverPct ?? (fwc ? 100 * Math.sqrt(Math.min(1, ((f.cr - m.avionicsW) * vt.eta) / f.Vc / ((k.thrustPerMotorG / 1000) * G * (rho / RHO0))))
+    : 100 * Math.sqrt(vt ? VT.download / VT.liftTWR : 1 / m.minTWR));
+  const maxThrustG = mcv ? mcv.maxThrustG : k.thrustPerMotorG * N;
   // minC: Li-ion from the sustained draw (realistic 2-10C packs), LiPo from the full-throttle peak (LiPo labels are burst-style ratings)
-  const ah = r.mah / 1000, burstC = Math.ceil(k.peakCurrentA / ah);
-  const cRating = c.liion ? Math.max(LIION.minC, Math.ceil((LIION.margin * contA(r)) / ah)) : Math.max(5, burstC);
+  const ah = r.mah / 1000, burstC = Math.ceil(peakA / ah);
+  // v5: a cold or aged pack (resistance x c.rF) delivers less current for its label, so the label C needed rises by the same factor
+  const cRating = c.liion ? Math.max(LIION.minC, Math.ceil((LIION.margin * contA(r) * c.rF) / ah)) : Math.max(5, Math.ceil(burstC * c.rF));
   const mahR = Math.round(r.mah / 10) * 10;
   const weights = { frameG: Math.round(k.frameG), motorsG: Math.round(k.motorG), escG: Math.round(k.escG), fcG: Math.round(k.fcG),
     batteryG: Math.round(r.mb * 1000), propsG: Math.round(k.propG), payloadG: Math.round(c.payload * 1000), otherG: Math.round(k.otherG),
@@ -694,7 +837,11 @@ function solve(c) {
     minThrustG: Math.round(vt.pusher.thrustG), propInch: vt.pusher.propInch, cells: k.cells } : null;
 
   // v4 R3: one T:W limit for the page (hover T:W for lift rotors, static thrust:weight for a fixed wing's cruise motor)
-  const minTwr = fwc ? vt.tw : vt ? VT.liftTWR : m.minTWR, twrOut = r2((maxThrustG * (rho / RHO0)) / (r.auw * 1000)), perf = performance(c, m, k, rho, r, chem);
+  const minTwr = fwc ? vt.tw : vt ? VT.liftTWR : m.minTWR, twrOut = r2((maxThrustG * (rho / RHO0)) / (r.auw * 1000)), perf = performance(c, m, mcv ? { ...k, thrustPerMotorG: mcv.maxThrustG / N } : k, rho, r, chem); // measured: the sweeps carry the curve's thrust
+  if (mcv) { // the throttle sweep is the measured curve (all motors, at this air density); the model's own sweep stays as throttleModel, the overlay
+    perf.throttleModel = performance(c, m, k, rho, r, chem).throttle;
+    perf.throttle = c.curve.points.map((q) => { const T = N * q.thrustG * dr, P = N * (q.powerW ?? q.voltageV * q.currentA); return { pct: q.pct, thrustG: Math.round(T), powerW: r1(P), currentA: r2(N * q.currentA), gPerW: P > 0 ? r2(T / P) : 0 }; });
+  }
   const bb = perf.batteryBest; // boundary pack within 5% of the design pack is the design pack: report the page's own numbers
   if (bb?.reason === "twrLimit" && Math.abs(bb.wh / r.wh - 1) <= 0.05) perf.batteryBest = { ...bb, wh: r1(r.wh), mah: mahR, flightMin: r1(r.flightMin), mult: 1, twr: twrOut };
   return {
@@ -702,18 +849,27 @@ function solve(c) {
     auwKg: r3(r.auw), dryWeightKg: r3(k.dryG / 1000), // dry = airframe+propulsion+avionics, excludes battery and payload
     // vtol/fixedwing: frameSizeMm = span; vtol: lift (tiltrotor: tilting) rotors; fixedwing: the cruise motor and prop
     weights, wiring: k.wiring, frameSizeMm: k.frameSizeMm, propInch: k.inch, motorCount: N, motorKv: k.kv, motorStatorMm: k.stator,
-    thrustPerMotorG: Math.round(k.thrustPerMotorG), maxThrustG: Math.round(maxThrustG),
+    thrustPerMotorG: Math.round(mcv ? mcv.maxThrustG / N : k.thrustPerMotorG), maxThrustG: Math.round(maxThrustG),
     twr: twrOut, minTwr, twrKind: fwc ? "static" : "hover", hoverThrottlePct: r1(hoverThrottle), // fixedwing: static TWR, cruise throttle
     batteryCells: k.cells, batteryMah: mahR, batteryWh: r1(r.wh), batteryCRating: cRating, batteryChemistry: chem,
     escContinuousA: k.escContinuousA, escBurstA: k.escBurstA,
-    hoverPowerW: Math.round(k.hoverPowerW), avgPowerW: Math.round(f.avg), peakCurrentA: Math.round(k.peakCurrentA), // fixedwing hoverPowerW: level cruise power
+    hoverPowerW: Math.round(k.hoverPowerW * f.kap), avgPowerW: Math.round(f.avg), peakCurrentA: Math.round(peakA), // fixedwing hoverPowerW: level cruise power
     estFlightMin: r1(r.flightMin), rangeKm, cruiseMs: vt ? r1(cruiseMs) : cruiseMs, // vtol estFlightMin includes the hover phases
     airDensity: r3(rho), estCostUsd, iterations: iters + 1,
-    warnings, meetsTarget,
+    warnings, warningIds: wids, meetsTarget,
     fpvClass,
     vtol: vtolOut,
     fixedWing,
     performance: perf,
+    ...(mcv ? { measuredCurve: { name: mcv.name, points: mcv.points, motors: N, maxThrustG: Math.round(mcv.maxThrustG), maxCurrentA: r1(mcv.maxCurrentA), peakA: r1(mcv.peakA), standV: mcv.standV,
+      hoverPct: mcv.hoverPct === null ? null : r1(mcv.hoverPct), hoverA: mcv.hoverPackA === null ? null : r1(mcv.hoverPackA), overCapacity: mcv.overCapacity, flightTime: !fwc } } : {}), // v6: absent = modelled
+    // v5: voltage sag at the hover and full-throttle draw, cold/age derate and hover calibration; every figure is an estimate (BATT)
+    battery: { estimate: true, chemistry: chem, cells: k.cells, nominalAh: r3(bAh), effectiveAh: r3(bAh * c.cap), capacityFactor: r3(c.cap), resistanceFactor: r3(c.rF), tempC: env.tempC, ageFadePct: c.age,
+      cellMOhm: r2((1000 * packOhm(chem, k.cells, bAh, c.rF)) / k.cells), packMOhm: r1(1000 * packOhm(chem, k.cells, bAh, c.rF)), floorV,
+      hoverA: r1(hoverA), hoverCellV: r2(hoverV), hoverPackV: r1(hoverV * k.cells), maxA: r1(maxA), maxCellV: r2(maxV), maxPackV: r1(maxV * k.cells),
+      calibration: measA === null ? null : { measuredA: c.measA ?? r2(measA), predictedA: r2(predA), factor: r3(c.kappa), kind: fwc ? "cruise" : "hover", uncalibratedFlightMin: r1(uncalMin),
+        ...(kRaw !== kLim ? { requestedFactor: r3(kRaw), limited: true } : {}), ...(c.measA === null ? { source: "curve" } : {}) },
+      warnings: [hoverW, maxW].filter(Boolean) },
     requirements: {
       fpvClass,
       frame: vt ? null : { minSizeMm: Math.round(k.frameSizeMm * 0.85), maxSizeMm: Math.round(k.frameSizeMm * 1.2), material: c.material, configuration: c.config },

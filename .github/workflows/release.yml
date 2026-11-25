@@ -1,0 +1,123 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+# No default token access; each job below grants only what it needs.
+permissions: {}
+
+jobs:
+  # Creates the one draft release before the parallel build jobs publish into it,
+  # so they cannot each create their own duplicate draft.
+  draft:
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the tag matches the package.json version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          if [ "${TAG#v}" != "$pkg" ]; then
+            echo "::error::Tag $TAG does not match version $pkg in package.json. Fix the version, then delete and re-create the tag."
+            exit 1
+          fi
+
+      - name: Create the draft release if it does not exist
+        env:
+          TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$TAG" || gh release create "$TAG" --draft --title "DroneCalc ${TAG#v}" --generate-notes
+
+  build:
+    needs: draft
+    if: always() && (needs.draft.result == 'success' || needs.draft.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            flags: --win
+          - os: macos-latest
+            flags: --mac
+          - os: ubuntu-latest
+            flags: --linux
+    runs-on: ${{ matrix.os }}
+    # electron-builder --publish always uploads the installers into the draft release.
+    permissions:
+      contents: write
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install rpm tools (needed for .rpm packages)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Build and publish a draft release
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder ${{ matrix.flags }} --publish always
+
+      - name: Build without publishing (test build)
+        if: github.ref_type != 'tag'
+        shell: bash
+        run: npx electron-builder ${{ matrix.flags }} --publish never
+
+      - name: Upload installers (test build)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installers-${{ matrix.os }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+          retention-days: 7
+          if-no-files-found: error
+
+  # The installers are unsigned, so publish SHA256 sums users can check them against.
+  # Hashes the files as they sit in the draft release, after every build leg has uploaded.
+  checksums:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Attach SHA256SUMS.txt to the draft release
+        env:
+          TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mkdir assets
+          cd assets
+          gh release download "$TAG" --pattern '*.exe' --pattern '*.dmg' --pattern '*.AppImage' --pattern '*.deb' --pattern '*.rpm'
+          sha256sum -- * > ../SHA256SUMS.txt
+          cat ../SHA256SUMS.txt
+          gh release upload "$TAG" ../SHA256SUMS.txt --clobber

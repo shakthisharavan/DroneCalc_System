@@ -32,7 +32,7 @@ for (const [name, r] of [["quad", quad], ["vtol", vtol], ["tiltrotor", tiltrotor
     assert.equal(typeof out, "string");
     assert.doesNotMatch(out, BAD, out.match(BAD)?.[0]);
     for (let i = 1; i <= 6; i++) assert.match(out, new RegExp(`<em>FIG ${i}</em>`), `fig ${i}`);
-    for (const re of [/class="pf-svg" role="img" tabindex="0" aria-label="Figure \d/g, /data-pf="table"/g, /data-pf="csv"/g, /<figcaption><b>Fig \d\./g, /class="pf-key"/g, /class="db"/g])
+    for (const re of [/class="pf-svg" role="img" tabindex="0" aria-label="Figure \d/g, /data-pf="table"/g, /data-pf="csv"/g, /<figcaption id="[^"]+"><b>Fig \d\./g, /class="pf-key"/g, /class="db"/g])
       assert.equal((out.match(re) || []).length >= 6, true, String(re));
     assert.doesNotMatch(out, /pf-miss/);
     assert.match(out, /class="vb[^"]*"/); // build point values printed on the figures
@@ -101,7 +101,7 @@ t("fpv: the class label appears in the captions that name the mission", () => {
   const out = renderPerformance(fpv, { missionLabel: "FPV freestyle/racing" });
   assert.doesNotMatch(out, BAD);
   assert.match(out, /pf-lede">[^<]*7 in long range/);
-  assert.match(out, /<figcaption><b>Fig 5\.<\/b> [^<]*FPV · 7 in long range mission/);
+  assert.match(out, /<figcaption id="[^"]+"><b>Fig 5\.<\/b> [^<]*FPV · 7 in long range mission/);
   assert.doesNotMatch(renderPerformance(quad, { missionLabel: "FPV freestyle/racing" }), /7 in/);
 });
 

@@ -442,3 +442,106 @@ Same pass as the "Round 10 runner (PARTIAL ...)" section above; this heading is 
 Node-only checks, rerun after the stop: 7/7 suites PASS (catalog, checks, engine, name, pdf, perf, ui); `node --check` js/*.js js/ui/*.js clean. File times: js/engine.js 11:56, js/ui/perf.js 12:16, js/ui/state.js 12:15.
 Browser work finished before the stop: the 4 mw repros only, and all four show KPI T:W equal to the Fig 2 / Fig 4 caption T:W (interceptor vtol mw=2200 2.04; inspection hex mw=2634 1.73 with Fig 2 "outside this sweep"; mapping vtol mw=3151 1.73 with Fig 2 "outside this sweep"; interceptor fixedwing mw=1127 0.75 static, Fig 2 copy "less than 0.1 min"). Details in the section above.
 Not verified this round: numbers vs round 9 on the 23 baseline hashes, Fig 2 / Fig 4 caption T:W on results pages without mw, hard reloads, console after 5 s (not read on the 4 repros either). Needs a server restart and a rerun.
+
+# Desktop app (Electron) loop, 2026-11-13
+
+Lanes: B1 web (fonts/, css/main.css, index.html, js/app.js), B2 desktop (package.json, electron/, build/, tests/desktop.test.mjs, .gitignore), B3 automation and docs (.github/workflows/, README.md, CONTRIBUTING.md). All Sonnet agents; no agent committed.
+
+## Round 1
+Built: self-hosted fonts (latin subset, 114 KB) and CSP without Google hosts; Copy link uses the GitHub Pages address outside http(s); Electron 45.3.2 + electron-builder 26.18.0 shell with a private app://dronecalc scheme, sandboxed renderer, https-only external links, single instance, update notice, --smoke mode; test/release/pages workflows with SHA-pinned actions; README and CONTRIBUTING rewritten.
+Fixes: Windows installer bundled x64 + arm64 (225.7 MB), now x64 only (115.9 MB). Config arch lists override CLI arch flags, so release.yml uses only --win/--mac/--linux. README file names aligned with electron-builder's real names (AppImage/rpm x86_64, deb amd64, arm64).
+
+## Round 2 tester
+Passed: 8/8 suites, smoke in dev and packaged; CDP on the packaged app: origin app://dronecalc, no console errors, fonts from app://, Copy link puts https://shakthisharavan.github.io/DroneCalc/#... on the clipboard, window.open and navigation to other origins blocked, no Node globals in the page, theme/saved builds/last build survive restart, second instance exits; website at 375/1366 light/dark clean; asar holds only site + electron files.
+Bugs: 1 Med (macOS lifecycle: quit on last window close, no activate handler), 5 Low (no update-fetch timeout, openExternal not caught, repo files incl. .git/config readable over app:// in dev, missing file gave a network error instead of 404, duplicate Quit on macOS). All fixed by B2: allow-list (index.html, css, js, fonts), fs.stat 404, AbortSignal.timeout(8000), github.com-only release URL, darwin-aware lifecycle.
+
+## Round 3 tester
+Round 2 fixes re-verified live (404 for .git/config, package.json, electron/main.js, nope.js in dev and packaged). Regression clean. Docs and workflows checked against package.json.
+Findings fixed: CI smoke on ubuntu-24.04 needs the AppArmor userns sysctl (added to test.yml) and the clipboard check is a warning under CI; release.yml now creates one draft in a `draft` job before the matrix (no duplicate drafts); macOS ad-hoc signing (identity "-", hardenedRuntime false) to avoid "damaged" on Apple Silicon; second-instance before ready guarded; engines node >= 22; README: macOS 13 (Ventura) or newer (Electron 45 floor), xattr fallback, Science category, privacy wording mentions the update check.
+Final: 8/8 suites, SMOKE OK dev and packaged.
+Not verified (needs real hardware or the first CI run): macOS and Linux builds and launch, arm64 deb/rpm cross-build, Pages deploy, SmartScreen behaviour of the unsigned installer.
+
+# Security audit and fix loop, 2026-11-13
+
+Strix scan skipped: no LLM API key. Replaced by three manual Sonnet audits (Electron shell, web app, supply chain/CI) plus an NSIS installer build test. No CRITICAL or HIGH findings.
+
+## Installer
+- DroneCalc-Setup-1.0.0.exe (~116 MB) built. Silent per-user install to a temp dir, --smoke OK, silent uninstall clean.
+- Known leftover, not fixed: %LOCALAPPDATA%\dronecalc-updater\installer.exe is not removed by the uninstaller.
+
+## Fixed, web (js/ui/state.js, new tests/security.test.mjs)
+- MEDIUM, confirmed: emoji split in cleanName caused URIError in hashOf and a blank app from a crafted share link. Names now cut on code points, lone surrogates dropped.
+- Bidi and zero-width chars stripped.
+- sel ids must match /^[a-z0-9][a-z0-9._-]{0,63}$/i.
+- Hashes over 4096 chars fall back to defaults.
+
+## Fixed, Electron (electron/main.js, electron/util.js, package.json build.electronFuses, tests/desktop.test.mjs)
+- MEDIUM: fuses RunAsNode, NodeOptions and NodeCliInspect disabled. OnlyLoadAppFromAsar and asar integrity enabled.
+- app:// realpath check blocks junction/symlink escape.
+- isReleaseUrl pinned to /shakthisharavan/DroneCalc/.
+- openExternal gets new URL(url).href.
+- app:// responses send the CSP header (identical to the index.html meta CSP) and X-Content-Type-Options: nosniff.
+
+## Fixed, CI (.github/)
+- release.yml: top-level permissions: {}. contents: write only on draft, build and checksums jobs. GH_TOKEN only on the publish step.
+- persist-credentials: false on all checkouts.
+- New checksums job attaches SHA256SUMS.txt to the draft release. Untested until first tag push.
+- New dependabot.yml (npm and github-actions, weekly).
+
+## Test flake
+- tests/pdf.test.mjs word-wrap timing budget raised 200 ms -> 1000 ms. 214 ms seen under parallel load; cubic regression is ~15 s.
+
+## Verification
+- npm test: 9/9 files, 4 consecutive runs.
+- npm run smoke OK. Packaged dist\win-unpacked\DroneCalc.exe --smoke OK. Fuses read back as expected.
+- PoCs re-run against fixed code: emoji link renders; 4000-case hash fuzz, 0 throws; app:// traversal all 404; live CSP and nosniff headers on all 18 responses.
+
+## Open, not fixed
+- Unsigned installers (needs a signing decision).
+- style-src 'unsafe-inline' (CSS refactor; not exploitable today).
+- No frame-ancestors on GitHub Pages (platform limit).
+- minimatch moderate advisory in build tooling (try electron-builder 26.18.1 or an npm override).
+- GrantFileProtocolExtraPrivileges fuse still default Enabled.
+- Tag ruleset and release environment reviewer: GitHub settings for the owner.
+- No SECURITY.md.
+
+# Round 2: features, hardening, compatibility (2026-11-15)
+
+Date: 2026-11-15.
+
+### Features (11)
+- Battery sag and cold-weather derate.
+- Battery age fade.
+- Hover-current calibration.
+- Build JSON import and export (backup) in My builds.
+- Custom part entry.
+- Thrust-curve CSV import.
+- Flight-log compare.
+- Metric/imperial toggle (display only; share links stay SI).
+- Accessibility pass: WCAG 2.2 AA targets, skip link, reduced motion.
+- Languages: English, Spanish, Hindi. Spanish and Hindi are machine-translated and need native-speaker review. Hindi PDF export falls back to English (the PDF writer cannot draw Devanagari).
+- Offline PWA: service worker, web app manifest, icons.
+
+### Security
+- Second security audit round: no critical or high findings. Every proven finding is fixed and has a regression test.
+
+### Cross-browser (Chromium, Firefox, WebKit)
+- Found stale service worker digests in sw.js. Fixed by re-running `--bump`.
+- Found a regex lookbehind in js/ui/units.js (Safari before 16.4 cannot parse it). Replaced with portable code.
+- Found `Array.findLastIndex` in js/engine.js. Replaced with portable code.
+- Found no notice for unsupported browsers. Added a static notice in index.html.
+
+### Final results
+- `npm test`: 106/106 pass.
+- `npm run smoke`: OK.
+- sw.js re-bumped: 34 files.
+
+### Still open
+- Unsigned installers: code-signing decision needed.
+- minimatch moderate advisory in build tooling (build-time only).
+- style-src 'unsafe-inline'.
+- GitHub repository settings the owner must apply: tag ruleset, release environment with required reviewer, branch protection.
+- Linux, macOS, arm64 and AppArmor behaviour not verified on real hardware.
+- .deb rebuild in Docker not yet re-verified.
+- GrantFileProtocolExtraPrivileges fuse still at its default (carried over from the security audit).
+- Nothing committed yet.

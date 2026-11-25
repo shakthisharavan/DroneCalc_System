@@ -1,4 +1,5 @@
-import { CATALOG, REGIONS, localLinks } from "./catalog.js";
+import { allParts, REGIONS, localLinks } from "./catalog.js";
+import { t } from "./i18n/i18n.js";
 
 // distance of v outside [lo,hi], relative; 0 when inside
 const near = (v, lo, hi) => (v >= lo && v <= hi ? 0 : v < lo ? (lo - v) / (lo || 1) : (v - hi) / (hi || 1));
@@ -67,7 +68,10 @@ const CORE = ["frame", "motor", "esc", "fc", "battery", "prop"];
 // Used only while the engine sends no requirements.camera (older engine).
 const CAMERA_KIND = { inspection: "gimbal4k", mapping: "survey", fpv: "fpv", interceptor: "fpv" };
 const regionOf = (region) => (typeof region === "string" && Object.hasOwn(REGIONS, region) ? region : "GLOBAL");
-const isLocal = (i, reg) => (i.links || []).some((l) => l.kind === "product" && (l.region || "GLOBAL") === reg);
+// a custom part is the user's own, in hand: it counts as local everywhere (else any locally listed catalog part would outrank it)
+const isLocal = (i, reg) => i.custom === true || (i.links || []).some((l) => l.kind === "product" && (l.region || "GLOBAL") === reg);
+// ...but it is not a store listing: it never filters the verified catalog fits out, and never hides the "no local listing" note
+const listed = (i, reg) => i.custom !== true && isLocal(i, reg);
 // lift and pusher motors are separate pools (a fixed wing's main motor comes from the pusher pool);
 // quadplane and tiltrotor airframes are separate; tilt = tilt-capable servos plus tilt mechanism kits
 const pool = (catalog, c, b) => catalog.filter((i) => {
@@ -87,13 +91,13 @@ function rank(cat, rule, items, mission, notes, cls) {
   const by = (a, b) => b.score - a.score || a.i.priceUsd - b.i.priceUsd;
   const fits = scored.filter((x) => x.ok).sort(by).map((x) => x.i);
   if (fits.length) return { fits, closest: [] };
-  if (!scored.length) { notes.push(`No ${cat} parts in catalog.`); return { fits, closest: [] }; }
+  if (!scored.length) { notes.push(t("match.noParts", { cat })); return { fits, closest: [] }; }
   // hard requirements unmet: never recommend; offer closest separately
-  notes.push(`No off-the-shelf ${cat} found that meets the requirements; closest options are listed separately and do NOT meet the spec.`);
+  notes.push(t("match.noFit", { cat }));
   return { fits, closest: scored.sort(by).slice(0, 3).map((x) => x.i) };
 }
 
-export function recommend(requirements, mission, budgetUsd, catalog = CATALOG, region = "US") {
+export function recommend(requirements, mission, budgetUsd, catalog = allParts(), region = "US") {
   const req = requirements || {}, reg = regionOf(region), vt = req.vtol || null, wing = req.wing || null, tilt = req.tilt || null;
   // tiltrotor: requirements.tilt, or (engine without that key yet) a vtol build whose pusher is null
   const b = { wing: !!wing, tilt: !!tilt || (!!vt && req.pusher === null) };
@@ -129,12 +133,16 @@ export function recommend(requirements, mission, budgetUsd, catalog = CATALOG, r
       if (fpvFc.length) fits = fpvFc;
       // pairing re-rank: the best-paired part beats a local listing (then the list is a region fallback: all international)
       if (adj && fits.length) { const top = Math.max(...fits.map(adj)); fits = [...fits].sort((x, y) => adj(y) - adj(x));
-        if (!fits.some((i) => adj(i) === top && isLocal(i, reg))) fits = fits.filter((i) => !isLocal(i, reg)); }
-      const loc = fits.filter((i) => isLocal(i, reg));
-      if (fits.length && !loc.length) regionFallback.push(c);
-      out[c] = (loc.length ? loc : fits).slice(0, 3).map(dress(c));
+        if (!fits.some((i) => adj(i) === top && isLocal(i, reg))) fits = fits.filter((i) => i.custom === true || !isLocal(i, reg)); }
+      const loc = fits.filter((i) => listed(i, reg));
+      if (fits.some((i) => i.custom !== true) && !loc.length) regionFallback.push(c);
+      // custom parts stay eligible beside the catalog fits (local listings first when there are any) and win only on score; they never crowd out every catalog fit
+      const eligible = fits.filter((i) => i.custom === true || !loc.length || listed(i, reg)), keep = eligible.find((i) => i.custom !== true);
+      let top3 = eligible.slice(0, 3);
+      if (keep && !top3.includes(keep)) top3 = [...top3.slice(0, 2), keep];
+      out[c] = top3.map(dress(c));
       if (cl.length) closest[c] = cl.map(dress(c));
-    } catch { notes.push(`Could not match ${c}.`); }
+    } catch { notes.push(t("match.failed", { cat: c })); }
   };
   for (const c of CATS) pick(c);
   // Pairing pass (SPEC-v4 compat): a frame that clears the props, an ESC rated for the motor's full-throttle current, then a battery plug that matches the ESC lead
@@ -151,7 +159,7 @@ export function recommend(requirements, mission, budgetUsd, catalog = CATALOG, r
   if (bad() && lead === out.esc[0]) pick("esc", (i) => low(i) - plugCost(out.battery[0], i));
   for (const c of CATS) if (need.has(c) && (c !== "camera" || mission === "inspection" || mission === "mapping") && !out[c].length) missing.push(c);
   regionFallback.splice(0, Infinity, ...new Set(regionFallback));
-  if (regionFallback.length) notes.push(`No local listing found in ${REGIONS[reg].name}; showing parts that ship internationally.`);
+  if (regionFallback.length) notes.push(t("match.noLocal", { region: REGIONS[reg].name }));
 
   // extras: cheapest mission-tagged item per extra category, local listings preferred (payload only if the mission tags it)
   out.extras = ["vtx", "gps", "radio", "payload", ...(vt || wing ? ["sensor"] : [])].flatMap((c) => {
@@ -162,7 +170,7 @@ export function recommend(requirements, mission, budgetUsd, catalog = CATALOG, r
   const sum = (f) => Math.round(Object.entries(out).reduce((a, [c, l]) => (!l.length ? a
     : a + (c === "extras" ? l.reduce((x, i) => x + i.lineUsd, 0) : f(l.map((i) => i.lineUsd)))), 0));
   out.totalUsd = { low: sum((p) => Math.min(...p)), high: sum((p) => Math.max(...p)) };
-  if (budgetUsd != null && out.totalUsd.low > budgetUsd) notes.push(`Cheapest combination (~$${out.totalUsd.low}) exceeds budget $${budgetUsd}.`);
+  if (budgetUsd != null && out.totalUsd.low > budgetUsd) notes.push(t("match.budget", { low: out.totalUsd.low, budget: budgetUsd }));
   out.notes = notes;
   out.closest = closest; // category -> near-miss parts that fail hard requirements
   out.missing = missing; // core categories with no fitting part
@@ -173,7 +181,7 @@ export function recommend(requirements, mission, budgetUsd, catalog = CATALOG, r
 }
 
 // Every catalog category -> all its items: mission-tagged first, then locally listed, each with localized links.
-export function listOptions(region, mission, catalog = CATALOG) {
+export function listOptions(region, mission, catalog = allParts()) {
   const reg = regionOf(region), out = {};
   for (const i of catalog) (out[i.category] ??= []).push(i);
   for (const c of Object.keys(out)) {

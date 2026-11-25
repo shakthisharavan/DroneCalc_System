@@ -1,0 +1,93 @@
+{
+  "name": "dronecalc",
+  "productName": "DroneCalc",
+  "version": "1.0.0",
+  "description": "Drone calculator and bill of materials: weight, power, flight time and matched parts for your mission.",
+  "author": "shakthisharavan",
+  "license": "MIT",
+  "homepage": "https://github.com/shakthisharavan/DroneCalc_System",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shakthisharavan/DroneCalc_System.git"
+  },
+  "desktopName": "dronecalc.desktop",
+  "main": "electron/main.js",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke",
+    "test": "node --test \"tests/*.test.mjs\"",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "45.3.2",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "io.github.shakthisharavan.dronecalc",
+    "productName": "DroneCalc",
+    "directories": { "output": "dist" },
+    "files": [
+      "index.html",
+      "css/**",
+      "js/**",
+      "fonts/**",
+      "electron/**",
+      "LICENSE",
+      "package.json"
+    ],
+    "icon": "build/icon.png",
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "onlyLoadAppFromAsar": true,
+      "enableEmbeddedAsarIntegrityValidation": true
+    },
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": "universal" }],
+      "identity": "-",
+      "hardenedRuntime": false,
+      "category": "public.app-category.productivity",
+      "artifactName": "${productName}-${version}-universal.${ext}"
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64", "arm64"] },
+        { "target": "deb", "arch": ["x64", "arm64"] },
+        { "target": "rpm", "arch": ["x64", "arm64"] }
+      ],
+      "category": "Science",
+      "maintainer": "shakthisharavan",
+      "synopsis": "Drone calculator and bill of materials",
+      "description": "Drone calculator and bill of materials: weight, power, flight time and matched parts for your mission.",
+      "syncDesktopName": true,
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "deb": {
+      "packageCategory": "science",
+      "depends": ["libgtk-3-0", "libnotify4", "libnss3", "libxss1", "libxtst6", "xdg-utils", "libatspi2.0-0", "libuuid1", "libsecret-1-0", "libasound2t64 | libasound2"]
+    },
+    "rpm": {
+      "depends": ["gtk3", "libnotify", "nss", "libXScrnSaver", "(libXtst or libXtst6)", "xdg-utils", "at-spi2-core", "(libuuid or libuuid1)", "alsa-lib"]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "shakthisharavan",
+      "repo": "DroneCalc_System",
+      "releaseType": "draft"
+    }
+  }
+}

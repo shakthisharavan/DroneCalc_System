@@ -6,12 +6,17 @@
 // perfTables(result) -> [{title, columns, rows}]: display strings, units in the column titles (PDF + on-screen tables).
 // A missing or partial series skips its figure with a short note; nothing here throws on odd input.
 import * as C from './charts.js';
+import * as U from './units.js';
 import { n as kn } from './state.js'; // the KPI tiles' formatter (toFixed), so strip and tiles never round differently
+import { t as tr, lazyMap } from '../i18n/i18n.js';
 // MISSIONS and FPV_CLASSES only (minimum thrust-to-weight, class labels); a broken or missing engine leaves the figures working
 const E = await import('../engine.js').catch(() => ({}));
 
 const { esc, fmt, PAL } = C;
 const fin = Number.isFinite;
+// Display units (units.js): the model and the sweeps stay SI; every figure's text and axes are converted at the edge.
+// fq = number in display units (charts' en-US format), sq = with the unit label. q = a units.js quantity.
+const fq = (q, v, d = 0) => fmt(U.toDisplay(q, v), d + U.dx(q)), sq = (q, v, d = 0) => `${fq(q, v, d)} ${U.label(q)}`;
 const sum = (a) => a.reduce((s, v) => s + v, 0);
 const up = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 // Finite rows only, sorted by the first key, duplicate x dropped (the curve needs strictly increasing x).
@@ -19,7 +24,7 @@ function clean(a, keys) {
   const rows = (Array.isArray(a) ? a : []).filter((r) => r && keys.every((k) => fin(r[k]))).sort((p, q) => p[keys[0]] - q[keys[0]]);
   return rows.filter((r, i) => !i || r[keys[0]] > rows[i - 1][keys[0]]);
 }
-const table = (title, cols, rows) => ({ title, columns: cols.map((c) => c[1]), rows: rows.map((r) => cols.map(([k, , d]) => fmt(r[k], d))) });
+const table = (title, cols, rows) => ({ title, columns: cols.map((c) => c[1]), rows: rows.map((r) => cols.map(([k, , d, q]) => (q ? fq(q, r[k], d) : fmt(r[k], d)))) });
 const near = (rows, k, x) => (fin(x) ? rows.reduce((b, r, i) => (Math.abs(r[k] - x) < Math.abs(rows[b][k] - x) ? i : b), 0) : -1);
 const dur = (s) => (s < 120 ? `${fmt(s)} s` : `${fmt(s / 60, 1)} min`);
 const K = { // legend keys
@@ -29,14 +34,14 @@ const K = { // legend keys
   sw: (t, c, st) => `<li><i class="k-sw${st ? ' st' : ''}" style="--c:${c}"></i>${esc(t)}</li>`,
 };
 
-// [key, column title, decimals]
-const COLS = {
-  speed: [['ms', 'Speed (m/s)', 1], ['powerW', 'Power (W)', 0], ['currentA', 'Current (A)', 1], ['flightMin', 'Flight time (min)', 1], ['rangeKm', 'Range (km)', 2]],
-  payload: [['kg', 'Payload (kg)', 2], ['flightMin', 'Flight time (min)', 1], ['twr', 'Thrust : weight', 2]],
-  battery: [['wh', 'Battery (Wh)', 0], ['flightMin', 'Flight time (min)', 1], ['auwKg', 'Takeoff mass (kg)', 2]],
-  throttle: [['pct', 'Throttle (%)', 0], ['thrustG', 'Thrust (g)', 0], ['powerW', 'Power (W)', 0], ['currentA', 'Current (A)', 1], ['gPerW', 'Efficiency (g/W)', 2]],
-};
-const xTips = (rows, xk, head, ys) => rows.map((r) => ({ x: fmt(r[xk], head[1]), h: `${fmt(r[xk], head[1])} ${head[0]}`, r: ys.filter(([k]) => fin(r[k])).map(([k, l, u, d]) => [`${fmt(r[k], d)}${u ? ' ' + u : ''}`, l]) }));
+// [key, column title, decimals, quantity]; a function, so the unit labels follow the display units
+const COLS = () => ({
+  speed: [['ms', tr('perf.col.speed', { unit: U.label('ms') }), 1, 'ms'], ['powerW', tr('perf.col.power'), 0], ['currentA', tr('perf.col.current'), 1], ['flightMin', tr('perf.col.flight'), 1], ['rangeKm', tr('perf.col.range', { unit: U.label('km') }), 2, 'km']],
+  payload: [['kg', tr('perf.col.payload', { unit: U.label('kg') }), 2, 'kg'], ['flightMin', tr('perf.col.flight'), 1], ['twr', tr('perf.col.twr'), 2]],
+  battery: [['wh', tr('perf.col.battery'), 0], ['flightMin', tr('perf.col.flight'), 1], ['auwKg', tr('perf.col.mass', { unit: U.label('kg') }), 2, 'kg']],
+  throttle: [['pct', tr('perf.col.throttle'), 0], ['thrustG', tr('perf.col.thrust', { unit: U.label('g') }), 0, 'g'], ['powerW', tr('perf.col.power'), 0], ['currentA', tr('perf.col.current'), 1], ['gPerW', tr('perf.col.eff', { unit: U.label('gw') }), 2, 'gw']],
+});
+const xTips = (rows, xk, head, ys) => rows.map((r) => { const x = head[2] ? fq(head[2], r[xk], head[1]) : fmt(r[xk], head[1]); return { x, h: `${x} ${head[0]}`, r: ys.filter(([k]) => fin(r[k])).map(([k, l, u, d, q]) => [q ? sq(q, r[k], d) : `${fmt(r[k], d)}${u ? ' ' + u : ''}`, l]) }; });
 const lineFig = (o) => ({ kind: 'x', render: (w, id) => C.panels(o.spec, w, id), ...o });
 // measured weight that differs from the estimate by at least a gram; same gram = nothing to say about "estimate" vs "measured"
 const dif = (r) => fin(r.measuredG) && Math.round(r.measuredG) !== Math.round(r.estG);
@@ -58,12 +63,12 @@ export const overlaps = hits; // one figure's svg markup -> number of label coll
 const fit = (vs) => (W, id) => { let best, bn = Infinity; for (const sp of vs) { const o = C.panels(sp, W, id), n = hits(o.inner); if (n < bn) { best = o; bn = n; if (!n) break; } } return best; };
 const withP = (sp, i, f) => ({ ...sp, panels: sp.panels.map((p, j) => (j === i ? f(p) : p)) });
 const close = (a, b) => fin(a) && fin(b) && Math.abs(a - b) <= 0.03 * Math.max(a, b); // flags this close would stack: merge them
-const and = (a) => (a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`);
+const and = (a) => (a.length < 2 ? a.join('') : tr('perf.and', { list: a.slice(0, -1).join(', '), last: a[a.length - 1] }));
 // FPV class label ("5 in freestyle"): the engine's FPV_CLASSES when it has them, else SPEC-v3 1.3
-const FPV = { 5: ['5 in freestyle', 7], 7: ['7 in long range', 4], 10: ['10 in long range heavy', 3] };
+const FPV_TWR = { 5: 7, 7: 4, 10: 3 }; // fallback minimum thrust : weight per class
 const fpvOf = (r) => {
   const k = r?.fpvClass == null ? '' : String(r.fpvClass), e = E.FPV_CLASSES?.[k];
-  return FPV[k] || e ? { label: e?.label || FPV[k][0], minTWR: fin(e?.minTWR) ? e.minTWR : FPV[k]?.[1] } : null;
+  return Object.hasOwn(FPV_TWR, k) || e ? { label: e?.label || tr(`fpv.${k}.label`), minTWR: fin(e?.minTWR) ? e.minTWR : FPV_TWR[k] } : null;
 };
 
 function speed(r, P, v, w) {
@@ -73,26 +78,25 @@ function speed(r, P, v, w) {
   const be = fin(P.bestSpeed?.enduranceMs) ? P.bestSpeed.enduranceMs : top('flightMin');
   const br = fin(P.bestSpeed?.rangeMs) ? P.bestSpeed.rangeMs : top('rangeKm');
   const a = w || v, e = dif(r) ? r.estAir : null, cr = fin(e?.cruiseMs) ? e.cruiseMs : fin(a?.cruiseMs) ? a.cruiseMs : r.cruiseMs, stall = fin(e?.stallMs) ? e.stallMs : a?.stallMs; // measured: the sweep, stall zone and cruise marker all stay at the estimated mass
-  const pn = [{ key: 'powerW', label: 'Power', unit: 'W', d: 0 }, { key: 'flightMin', label: 'Flight time', unit: 'min', d: 1 }, { key: 'rangeKm', label: 'Range', unit: 'km', d: 1 }];
-  const at = (k, x) => C.curve(rows, 'ms', k).f(x), vals = (x) => pn.map((p) => `${fmt(at(p.key, x), p.d)} ${p.unit}`);
-  const marks = [{ x: be, label: `Endurance ${fmt(be, 1)}`, kind: 'ref', dots: [1] }, { x: br, label: `Range ${fmt(br, 1)}`, kind: 'ref', dots: [2] }];
-  const same = close(cr, br) ? 'Range' : close(cr, be) ? 'Endurance' : '';
-  if (same) marks.splice(same === 'Range' ? 1 : 0, 1);
-  if (fin(cr)) marks.push({ x: cr, label: same ? `${same} = Cruise ${fmt(cr, 1)}` : `Cruise ${fmt(cr, 1)}`, kind: 'build', vals: vals(cr) });
-  if (w && fin(stall)) marks.push({ x: stall, label: `Stall ${fmt(stall, 1)}`, kind: 'lim' }); // no hover to fall back on: a hard floor
-  const zones = fin(stall) ? [{ x0: 0, x1: stall, label: 'Stall' }] : [];
+  const pn = [{ key: 'powerW', label: tr('perf.power'), unit: 'W', d: 0 }, { key: 'flightMin', label: tr('perf.flightTime'), unit: 'min', d: 1 }, { key: 'rangeKm', label: tr('perf.range'), unit: 'km', d: 1, q: 'km' }];
+  const at = (k, x) => C.curve(rows, 'ms', k).f(x), vals = (x) => pn.map((p) => (p.q ? sq(p.q, at(p.key, x), p.d) : `${fmt(at(p.key, x), p.d)} ${p.unit}`));
+  const marks = [{ x: be, label: tr('perf.mark.endurance', { v: fq('ms', be, 1) }), kind: 'ref', dots: [1] }, { x: br, label: tr('perf.mark.range', { v: fq('ms', br, 1) }), kind: 'ref', dots: [2] }];
+  const same = close(cr, br) ? 'range' : close(cr, be) ? 'endurance' : '';
+  if (same) marks.splice(same === 'range' ? 1 : 0, 1);
+  if (fin(cr)) marks.push({ x: cr, label: same ? tr('perf.mark.sameCruise', { name: tr(`perf.${same}`), v: fq('ms', cr, 1) }) : tr('perf.mark.cruise', { v: fq('ms', cr, 1) }), kind: 'build', vals: vals(cr) });
+  if (w && fin(stall)) marks.push({ x: stall, label: tr('perf.mark.stall', { v: fq('ms', stall, 1) }), kind: 'lim' }); // no hover to fall back on: a hard floor
+  const zones = fin(stall) ? [{ x0: 0, x1: stall, label: tr('perf.stall') }] : [];
   const c = vals(cr);
-  const cap = `Power, flight time and range against airspeed. Endurance peaks at ${fmt(be, 1)} m/s (${fmt(at('flightMin', be), 1)} min); range peaks at ${fmt(br, 1)} m/s (${fmt(at('rangeKm', br), 1)} km).` +
-    (fin(cr) ? ` At the ${fmt(cr, 1)} m/s cruise, steady level flight, still air, full pack: ${c.join(', ')}. The headline figures above are the whole-mission estimate (${a ? 'launch, climb' : 'takeoff, landing'} and reserve).` : '') +
-    (!fin(stall) ? '' : w ? ` Below the ${fmt(stall, 1)} m/s stall boundary (hatched) the wing cannot fly: a fixed wing has no hover.`
-      : ` Below ${fmt(stall, 1)} m/s the wing stalls (hatched): the ${v?.type === 'tiltrotor' ? 'rotors tilt back up and' : 'lift motors'} carry it.`);
+  const cap = tr('perf.speed.cap', { be: sq('ms', be, 1), bm: fmt(at('flightMin', be), 1), br: sq('ms', br, 1), brk: sq('km', at('rangeKm', br), 1) }) +
+    (fin(cr) ? ' ' + tr('perf.speed.cruise', { cr: sq('ms', cr, 1), vals: c.join(', '), phases: tr(a ? 'perf.speed.launchClimb' : 'perf.speed.takeoffLanding') }) : '') +
+    (!fin(stall) ? '' : ' ' + (w ? tr('perf.speed.stallWing', { s: sq('ms', stall, 1) }) : tr(v?.type === 'tiltrotor' ? 'perf.speed.stallTilt' : 'perf.speed.stallVtol', { s: sq('ms', stall, 1) })));
   return lineFig({
-    n: 1, key: 'speed', title: 'Speed polar', cap,
-    spec: { rows, x: { key: 'ms', label: 'Airspeed', unit: 'm/s', ...(fin(stall) ? { lo: stall * 0.8 } : {}) }, panels: pn, marks, zones },
-    legend: K.ln('Model curve') + (fin(cr) ? K.bd(`Cruise ${fmt(cr, 1)} m/s, steady level`) : '') + K.rf('Best-endurance and best-range speeds') +
-      (w && fin(stall) ? K.lm(`Stall boundary ${fmt(stall, 1)} m/s`) : '') + (fin(stall) ? K.hz('Below stall') : ''),
-    tips: xTips(rows, 'ms', ['m/s', 1], [['powerW', 'Power', 'W', 0], ['currentA', 'Current', 'A', 1], ['flightMin', 'Flight time', 'min', 1], ['rangeKm', 'Range', 'km', 2]]),
-    start: near(rows, 'ms', fin(cr) ? cr : be), table: table('Fig 1. Speed sweep', COLS.speed, rows),
+    n: 1, key: 'speed', title: tr('perf.title.speed'), cap,
+    spec: { rows, q: { ms: 'ms', rangeKm: 'km' }, x: { key: 'ms', label: tr('perf.airspeed'), unit: 'm/s', ...(fin(stall) ? { lo: stall * 0.8 } : {}) }, panels: pn, marks, zones },
+    legend: K.ln(tr('perf.legend.model')) + (fin(cr) ? K.bd(tr('perf.legend.cruise', { v: sq('ms', cr, 1) })) : '') + K.rf(tr('perf.legend.best')) +
+      (w && fin(stall) ? K.lm(tr('perf.legend.stall', { v: sq('ms', stall, 1) })) : '') + (fin(stall) ? K.hz(tr('perf.legend.belowStall')) : ''),
+    tips: xTips(rows, 'ms', [U.label('ms'), 1, 'ms'], [['powerW', tr('perf.power'), 'W', 0], ['currentA', tr('perf.current'), 'A', 1], ['flightMin', tr('perf.flightTime'), 'min', 1], ['rangeKm', tr('perf.range'), 'km', 2, 'km']]),
+    start: near(rows, 'ms', fin(cr) ? cr : be), table: table(tr('perf.speed.table'), COLS().speed, rows),
   });
 }
 
@@ -107,60 +111,63 @@ function payload(r, P, minTWR, mn, wing) {
     const i = rows.findIndex((p) => p.twr < minTWR), a = rows[i - 1], b = rows[i];
     cross = i < 0 ? NaN : !i ? rows[0].kg : a.kg + ((b.kg - a.kg) * (a.twr - minTWR)) / (a.twr - b.twr || 1);
   }
-  const t = C.curve(rows, 'kg', 'flightMin').f, wc = C.curve(rows, 'kg', 'twr').f, w = (x) => (fin(r.twr) && fin(kg) && x === kg ? r.twr : wc(x)); // at the build's own point, the result's T:W (tile, band, Fig 4 say the same number)
+  const ft = C.curve(rows, 'kg', 'flightMin').f, wc = C.curve(rows, 'kg', 'twr').f, w = (x) => (fin(r.twr) && fin(kg) && x === kg ? r.twr : wc(x)); // at the build's own point, the result's T:W (tile, band, Fig 4 say the same number)
   const per100 = ((rows[0].flightMin - last.flightMin) / (last.kg - rows[0].kg)) * 0.1;
   const lim = fmt(minTWR, 1);
-  const tn = wing ? 'static thrust-to-weight' : 'thrust-to-weight';
-  const cap = `Flight time and ${tn} against payload, same ${fmt(r.batteryWh)} Wh pack throughout. Each extra 100 g costs ${per100 < 0.05 ? 'less than 0.1 min' : `about ${fmt(per100, 1)} min`}.` +
-    (fin(mk) ? ` Your measured ${fmt(r.measuredG)} g flies like ${fmt(mk, 2)} kg of payload on this build${fin(kg) ? `: ${fmt(t(kg), 1)} min, ${tn} ${fmt(w(kg), 2)}` : ', outside this sweep'}.`
-      : fin(kg) ? ` At your ${fmt(kg, 2)} kg: ${fmt(t(kg), 1)} min, ${tn} ${fmt(w(kg), 2)}.` : '') +
-    (fin(cross) ? ` From ${fmt(cross, 2)} kg up, thrust-to-weight is below the ${mn || 'mission'} minimum of ${lim} (hatched).` : '') +
-    (wing ? ' The wing carries the weight in flight, so there is no thrust-to-weight floor; static thrust matters for the launch.' : '');
+  const tn = tr(wing ? 'perf.tw.static' : 'perf.tw');
+  const cap = tr('perf.payload.cap', { tn, wh: fmt(r.batteryWh), g100: sq('g', 100), cost: per100 < 0.05 ? tr('perf.payload.costLess') : tr('perf.payload.costAbout', { m: fmt(per100, 1) }) }) +
+    (fin(mk) ? ' ' + tr('perf.payload.measured', { mg: sq('g', r.measuredG), mk: sq('kg', mk, 2), tail: fin(kg) ? tr('perf.payload.measuredIn', { min: fmt(ft(kg), 1), tn, twr: fmt(w(kg), 2) }) : tr('perf.payload.measuredOut') })
+      : fin(kg) ? ' ' + tr('perf.payload.at', { kg: sq('kg', kg, 2), min: fmt(ft(kg), 1), tn, twr: fmt(w(kg), 2) }) : '') +
+    (fin(cross) ? ' ' + tr('perf.payload.below', { kg: sq('kg', cross, 2), mn: mn || tr('perf.missionWord'), lim }) : '') +
+    (wing ? ' ' + tr('perf.payload.wing') : '');
   const spec = {
-    rows, x: { key: 'kg', label: 'Payload', unit: 'kg' },
-    panels: [{ key: 'flightMin', label: 'Flight time', unit: 'min', w: 2 }, { key: 'twr', label: wing ? 'Static thrust : weight' : 'Thrust : weight', w: 1, refs: fin(minTWR) ? [{ y: minTWR, label: `Min ${lim}`, kind: 'lim' }] : [] }],
-    marks: fin(kg) ? [{ x: kg, label: fin(mk) ? `Measured ${fmt(kg, 2)}` : `Payload ${fmt(kg, 2)}`, kind: 'build', vals: [`${fmt(t(kg), 1)} min`, fmt(w(kg), 2)] }] : [],
-    zones: fin(cross) ? [{ x0: cross, x1: last.kg, label: `TWR < ${lim}` }] : [],
+    rows, q: { kg: 'kg' }, x: { key: 'kg', label: tr('perf.payloadWord'), unit: 'kg' },
+    panels: [{ key: 'flightMin', label: tr('perf.flightTime'), unit: 'min', w: 2 }, { key: 'twr', label: tr(wing ? 'perf.staticTwr' : 'perf.twr'), w: 1, refs: fin(minTWR) ? [{ y: minTWR, label: tr('perf.min', { v: lim }), kind: 'lim' }] : [] }],
+    marks: fin(kg) ? [{ x: kg, label: tr(fin(mk) ? 'perf.mark.measured' : 'perf.mark.payload', { v: fq('kg', kg, 2) }), kind: 'build', vals: [`${fmt(ft(kg), 1)} min`, fmt(w(kg), 2)] }] : [],
+    zones: fin(cross) ? [{ x0: cross, x1: last.kg, label: tr('perf.zone.twr', { lim }) }] : [],
   };
   // the measured marker can land beside the "Min" label: right, left, then bare number on each side
-  const vs = fin(minTWR) ? [[`Min ${lim}`, 'r'], [`Min ${lim}`, 'l'], [lim, 'r'], [lim, 'l']].map(([label, at]) => withP(spec, 1, (p) => ({ ...p, refs: [{ ...p.refs[0], label, at }] }))) : [spec];
+  const vs = fin(minTWR) ? [[tr('perf.min', { v: lim }), 'r'], [tr('perf.min', { v: lim }), 'l'], [lim, 'r'], [lim, 'l']].map(([label, at]) => withP(spec, 1, (p) => ({ ...p, refs: [{ ...p.refs[0], label, at }] }))) : [spec];
   return lineFig({
-    n: 2, key: 'payload', title: 'Payload sweep', cap, spec, render: fit(vs),
-    legend: K.ln('Model curve') + (fin(kg) ? K.bd(fin(mk) ? `Measured weight, as ${fmt(kg, 2)} kg payload` : `Your payload ${fmt(kg, 2)} kg`) : '') + (fin(minTWR) ? K.hz(`Thrust : weight below ${lim}`) : ''),
-    tips: xTips(rows, 'kg', ['kg payload', 2], [['flightMin', 'Flight time', 'min', 1], ['twr', 'Thrust : weight', '', 2]]).map((tp, i) => (fin(minTWR) && rows[i].twr < minTWR ? { ...tp, r: [...tp.r, ['Below', `mission min ${lim}`]] } : tp)),
-    start: near(rows, 'kg', kg), table: table('Fig 2. Payload sweep (same pack)', COLS.payload, rows),
+    n: 2, key: 'payload', title: tr('perf.title.payload'), cap, spec, render: fit(vs),
+    legend: K.ln(tr('perf.legend.model')) + (fin(kg) ? K.bd(fin(mk) ? tr('perf.legend.measured', { v: sq('kg', kg, 2) }) : tr('perf.legend.yourPayload', { v: sq('kg', kg, 2) })) : '') + (fin(minTWR) ? K.hz(tr('perf.legend.twrBelow', { lim })) : ''),
+    tips: xTips(rows, 'kg', [tr('perf.tip.payload', { unit: U.label('kg') }), 2, 'kg'], [['flightMin', tr('perf.flightTime'), 'min', 1], ['twr', tr('perf.twr'), '', 2]]).map((tp, i) => (fin(minTWR) && rows[i].twr < minTWR ? { ...tp, r: [...tp.r, [tr('perf.tip.below'), tr('perf.tip.missionMin', { lim })]] } : tp)),
+    start: near(rows, 'kg', kg), table: table(tr('perf.payload.table'), COLS().payload, rows),
   });
 }
 
 function battery(r, P, minTWR) {
   const rows = clean(P.battery, ['wh', 'flightMin', 'auwKg']);
   if (rows.length < 3) return null;
-  const wh = r.batteryWh, last = rows[rows.length - 1], t = C.curve(rows, 'wh', 'flightMin').f;
-  const slope = (x) => { const h = (last.wh - rows[0].wh) / 50; return ((t(Math.min(last.wh, x + h)) - t(Math.max(rows[0].wh, x - h))) / (Math.min(last.wh, x + h) - Math.max(rows[0].wh, x - h))) * 10; };
-  const ok = fin(wh) && wh > 0, gain = ok ? (last.flightMin / t(wh) - 1) * 100 : NaN, ratio = ok ? last.wh / wh : NaN;
-  const own = !dif(r) && fin(r.estFlightMin) ? r.estFlightMin : ok ? t(wh) : NaN; // matches the KPI; a measured build's Fig 3 is labelled estimate
+  const wh = r.batteryWh, last = rows[rows.length - 1], ft = C.curve(rows, 'wh', 'flightMin').f;
+  const slope = (x) => { const h = (last.wh - rows[0].wh) / 50; return ((ft(Math.min(last.wh, x + h)) - ft(Math.max(rows[0].wh, x - h))) / (Math.min(last.wh, x + h) - Math.max(rows[0].wh, x - h))) * 10; };
+  const ok = fin(wh) && wh > 0, gain = ok ? (last.flightMin / ft(wh) - 1) * 100 : NaN, ratio = ok ? last.wh / wh : NaN;
+  const own = !dif(r) && fin(r.estFlightMin) ? r.estFlightMin : ok ? ft(wh) : NaN; // matches the KPI; a measured build's Fig 3 is labelled estimate
   // Feasibility (engine: point.feasible, batteryBest): past the T:W limit the pack is too heavy to fly, so that stretch is hatched and never recommended.
   const B = P.batteryBest, bad = rows.findIndex((q) => q.feasible === false), hasF = rows.some((q) => typeof q.feasible === 'boolean');
   const M = B?.reason === 'twrLimit' && fin(B.twr) ? B.twr : minTWR, a = rows[bad - 1], b = rows[bad];
   const limX = bad < 0 ? NaN : B?.reason === 'twrLimit' && fin(B.wh) ? B.wh : !a ? b.wh : fin(a.twr) && fin(b.twr) && fin(M) && a.twr !== b.twr ? a.wh + ((b.wh - a.wh) * (a.twr - M)) / (a.twr - b.twr) : (a.wh + b.wh) / 2;
   const lim = fin(limX), k = lim && ok ? limX / wh : NaN, mt = fin(M) ? String(+M.toFixed(2)) : '';
-  const cap = `Flight time and takeoff mass against pack energy, same payload. The pack carries its own weight, so returns diminish.` +
-    (ok ? ` Your ${fmt(wh)} Wh pack gives ${fmt(own, 1)} min; there each extra 10 Wh adds ${fmt(slope(wh), 1)} min.` : '') +
-    (lim ? ` Bigger packs would fly longer only with stronger motors: past ${fin(k) && Math.abs(k - 1) <= 0.05 ? `this pack (${fmt(limX)} Wh)` : fin(k) ? `${fmt(k, 2)}x the pack (${fmt(limX)} Wh)` : `${fmt(limX)} Wh`} thrust : weight drops below ${mt || 'the mission minimum'} (hatched).`
-      : ok ? ` At ${fmt(last.wh)} Wh only ${fmt(slope(last.wh), 1)} min. ${fmt(ratio, 1)}x the pack buys ${fmt(gain)}% more time.` : '');
+  // v5: say when the sweep's flight times carry the engine's cold/age derate or the hover calibration (r.battery)
+  const bt = r.battery, dr = and([bt?.capacityFactor < 1 && tr('perf.battery.derate', { pct: fmt(bt.capacityFactor * 100) }), bt?.calibration && tr('perf.battery.calib', { factor: fmt(bt.calibration.factor, 2) })].filter(Boolean));
+  const past = fin(k) && Math.abs(k - 1) <= 0.05 ? tr('perf.battery.pastThis', { wh: fmt(limX) }) : fin(k) ? tr('perf.battery.pastX', { k: fmt(k, 2), wh: fmt(limX) }) : `${fmt(limX)} Wh`;
+  const cap = tr('perf.battery.cap') + (dr ? ' ' + tr('perf.battery.incl', { what: dr }) : '') +
+    (ok ? ' ' + tr('perf.battery.own', { wh: fmt(wh), min: fmt(own, 1), per: fmt(slope(wh), 1) }) : '') +
+    (lim ? ' ' + tr('perf.battery.limit', { past, mt: mt || tr('perf.battery.missionMin') })
+      : ok ? ' ' + tr('perf.battery.more', { wh: fmt(last.wh), per: fmt(slope(last.wh), 1), ratio: fmt(ratio, 1), gain: fmt(gain) }) : '');
   return lineFig({
-    n: 3, key: 'battery', title: 'Battery sweep', cap,
+    n: 3, key: 'battery', title: tr('perf.title.battery'), cap,
     spec: {
-      rows, x: { key: 'wh', label: 'Battery energy', unit: 'Wh' },
-      panels: [{ key: 'flightMin', label: 'Flight time', unit: 'min', w: 2, end: !lim && ok && gain > 0 ? `+${fmt(gain)}% at ${fmt(ratio, 1)}x pack` : '' }, { key: 'auwKg', label: 'Takeoff mass', unit: 'kg', w: 1 }],
-      marks: [...(ok ? [{ x: wh, label: `Pack ${fmt(wh)} Wh`, kind: 'build', vals: [`${fmt(own, 1)} min`, `${fmt(C.curve(rows, 'wh', 'auwKg').f(wh), 2)} kg`] }] : []),
-        ...(lim ? [{ x: limX, label: `T:W below ${mt} past here`, kind: 'lim' }] : [])],
-      zones: lim ? [{ x0: limX, x1: last.wh, label: `T:W < ${mt}` }] : [],
+      rows, q: { auwKg: 'kg' }, x: { key: 'wh', label: tr('perf.battery.energy'), unit: 'Wh' },
+      panels: [{ key: 'flightMin', label: tr('perf.flightTime'), unit: 'min', w: 2, end: !lim && ok && gain > 0 ? tr('perf.battery.end', { gain: fmt(gain), ratio: fmt(ratio, 1) }) : '' }, { key: 'auwKg', label: tr('perf.mass'), unit: 'kg', w: 1 }],
+      marks: [...(ok ? [{ x: wh, label: tr('perf.battery.pack', { wh: fmt(wh) }), kind: 'build', vals: [`${fmt(own, 1)} min`, sq('kg', C.curve(rows, 'wh', 'auwKg').f(wh), 2)] }] : []),
+        ...(lim ? [{ x: limX, label: tr('perf.battery.twrPast', { mt }), kind: 'lim' }] : [])],
+      zones: lim ? [{ x0: limX, x1: last.wh, label: tr('perf.battery.zone', { mt }) }] : [],
     },
-    legend: K.ln('Model curve') + (ok ? K.bd(`Your pack ${fmt(wh)} Wh`) : '') + (lim ? K.lm(`T:W limit ${fmt(limX)} Wh`) + K.hz(`Too heavy to fly: T:W below ${mt}`) : ''),
-    tips: xTips(rows, 'wh', ['Wh pack', 0], [['flightMin', 'Flight time', 'min', 1], ['auwKg', 'Takeoff mass', 'kg', 2]]).map((tp, i) => (rows[i].feasible === false ? { ...tp, r: [...tp.r, ['Does not fly', `T:W below ${mt}`]] } : tp)),
+    legend: K.ln(tr('perf.legend.model')) + (ok ? K.bd(tr('perf.battery.yours', { wh: fmt(wh) })) : '') + (lim ? K.lm(tr('perf.battery.limitLegend', { wh: fmt(limX) })) + K.hz(tr('perf.battery.tooHeavy', { mt })) : ''),
+    tips: xTips(rows, 'wh', [tr('perf.tip.whPack'), 0], [['flightMin', tr('perf.flightTime'), 'min', 1], ['auwKg', tr('perf.mass'), 'kg', 2, 'kg']]).map((tp, i) => (rows[i].feasible === false ? { ...tp, r: [...tp.r, [tr('perf.battery.noFly'), tr('perf.battery.twrBelow', { mt })]] } : tp)),
     start: near(rows, 'wh', wh),
-    table: ((tb) => (hasF ? { ...tb, columns: [...tb.columns, 'Flies?'], rows: tb.rows.map((x, i) => [...x, rows[i].feasible === false ? 'no' : 'yes']) } : tb))(table('Fig 3. Battery sweep (same payload)', COLS.battery, rows)),
+    table: ((tb) => (hasF ? { ...tb, columns: [...tb.columns, tr('perf.battery.flies')], rows: tb.rows.map((x, i) => [...x, rows[i].feasible === false ? tr('perf.no') : tr('perf.yes')]) } : tb))(table(tr('perf.battery.table'), COLS().battery, rows)),
   });
 }
 
@@ -182,120 +189,124 @@ function throttle(r, P, v, w) {
   const T = C.curve(rows, 'pct', 'thrustG').f, G = C.curve(rows, 'pct', 'gPerW').f, wl = per ? auwG / N : auwG;
   // fixed wing: no hover; the build point is cruise, where the sweep draws the cruise phase's power
   const cp = (Array.isArray(P.profile) ? P.profile : []).find((p) => p?.phase === 'cruise')?.powerW, cruW = fin(cp) ? cp : r.avgPowerW;
-  const hv = w ? atPower(rows, cruW) : r.hoverThrottlePct, hn = w ? 'Cruise' : 'Hover', st = w ? ' static' : '', em = w && dif(r) ? ' (estimate)' : ''; // wing cruise power comes from the estimated mission, the weight line is measured
-  const twr = fin(r.twr) ? r.twr : ((per ? N : 1) * last.thrustG) / auwG, who = w ? 'Cruise motor, static thrust. ' : tilt ? 'Tilting rotors, hover thrust. ' : v ? 'Lift motors. ' : '';
-  const cap = `${who}Thrust and efficiency against throttle.` +
-    (fin(hv) ? (w ? ` Cruise draws about ${fmt(cruW)} W${em ? ' at the estimated mass' : ''}. On a static test stand that is about ${fmt(hv)}% throttle${fin(r.hoverThrottlePct) && r.hoverThrottlePct < hv ? `; in flight the airspeed unloads the propeller, so the cruise setting on the headline tile (${fmt(r.hoverThrottlePct)}%) is lower.` : '.'}` : ` Hover at ${fmt(hv)}% throttle (${fmt(T(hv))} g${per ? ' per motor' : ''}) runs at ${fmt(G(hv), 1)} g/W.`) : '') +
-    ` Full throttle gives ${fmt(last.thrustG)} g${per ? ' per motor' : st} (thrust : weight ${fmt(twr, 2)}) at ${fmt(last.gPerW, 1)} g/W.` +
-    (w ? ' In flight the propeller unloads, so thrust falls with airspeed.' : '');
+  const hv = w ? atPower(rows, cruW) : r.hoverThrottlePct, hn = tr(w ? 'perf.cruise' : 'perf.hover'), st = w ? ' ' + tr('perf.static') : '', em = w && dif(r) ? ' ' + tr('perf.estimateParen') : ''; // wing cruise power comes from the estimated mission, the weight line is measured
+  const twr = fin(r.twr) ? r.twr : ((per ? N : 1) * last.thrustG) / auwG, who = w ? tr('perf.who.wing') + ' ' : tilt ? tr('perf.who.tilt') + ' ' : v ? tr('perf.who.lift') + ' ' : '', pm = ' ' + tr('perf.perMotor');
+  // measured thrust curve (engine v6): the rows are the thrust-stand curve scaled to all motors, the model's own sweep is the overlay
+  const mc = r.measuredCurve && typeof r.measuredCurve === 'object' ? r.measuredCurve : null, mod = mc ? clean(P.throttleModel, ['pct', 'thrustG', 'gPerW']) : [], hasOv = mod.length >= 3;
+  const cap = who + tr('perf.throttle.cap') + (mc ? ' ' + tr('perf.throttle.measured', { count: mc.motors, name: mc.name ? ` "${mc.name}"` : '', points: fmt(mc.points), motors: fmt(mc.motors), dashed: hasOv ? tr('perf.throttle.dashed') : '' }) : '') +
+    (fin(hv) ? (w ? ' ' + tr('perf.throttle.cruise', { w: fmt(cruW), est: em ? ' ' + tr('perf.throttle.atEst') : '', hv: fmt(hv), tail: fin(r.hoverThrottlePct) && r.hoverThrottlePct < hv ? tr('perf.throttle.tailLow', { pct: fmt(r.hoverThrottlePct) }) : '.' })
+      : ' ' + tr('perf.throttle.hover', { hv: fmt(hv), thrust: sq('g', T(hv)) + (per ? pm : ''), eff: sq('gw', G(hv), 1) })) : '') +
+    ' ' + tr('perf.throttle.full', { thrust: sq('g', last.thrustG) + (per ? pm : st), twr: fmt(twr, 2), eff: sq('gw', last.gPerW, 1) }) +
+    (w ? ' ' + tr('perf.throttle.wing') : '');
   const spec = {
-    rows, x: { key: 'pct', label: 'Throttle', unit: '%', lo: 0, hi: 100 },
-    panels: [{ key: 'thrustG', label: per ? 'Thrust per motor' : 'Total thrust', unit: 'g', w: 2, end: `Max ${fmt(last.thrustG)} g`, refs: fin(wl) ? [{ y: wl, label: per ? `Weight / ${N}` : 'Takeoff weight', at: 'l' }] : [] }, { key: 'gPerW', label: 'Efficiency', unit: 'g/W', w: 1 }],
-    marks: fin(hv) ? [{ x: hv, label: w ? `${fmt(hv)}% bench throttle${em}` : `${hn} ${fmt(hv)}%`, kind: 'build', vals: [`${fmt(T(hv))} g`, `${fmt(G(hv), 1)} g/W`] }] : [],
+    rows, q: { thrustG: 'g', gPerW: 'gw' }, x: { key: 'pct', label: tr('perf.throttleWord'), unit: '%', lo: 0, hi: 100 }, ...(hasOv ? { over: { rows: mod } } : {}),
+    panels: [{ key: 'thrustG', label: tr(per ? 'perf.thrustPerMotor' : 'perf.totalThrust'), unit: 'g', w: 2, end: tr('perf.max', { v: sq('g', last.thrustG) }), refs: fin(wl) ? [{ y: wl, label: per ? tr('perf.weightN', { n: N }) : tr('perf.takeoffWeight'), at: 'l' }] : [] }, { key: 'gPerW', label: tr('perf.efficiency'), unit: 'g/W', w: 1 }],
+    marks: fin(hv) ? [{ x: hv, label: w ? tr('perf.throttle.bench', { hv: fmt(hv), est: em }) : `${hn} ${fmt(hv)}%`, kind: 'build', vals: [sq('g', T(hv)), sq('gw', G(hv), 1)] }] : [],
   };
   // The build point sits on the weight line, so its value tag can print over the line's label, and a measured weight can put it under the "Max" note:
   // try the weight label left, right, short left, short right, each with the full, the bare-number, then no end note.
   const vs = [];
-  if (fin(wl)) for (const end of [spec.panels[0].end, `${fmt(last.thrustG)} g`, undefined]) for (const [label, at] of [[spec.panels[0].refs[0].label, 'l'], [spec.panels[0].refs[0].label, 'r'], [per ? 'Weight' : 'Takeoff', 'l'], [per ? 'Weight' : 'Takeoff', 'r']]) vs.push(withP(spec, 0, (p) => ({ ...p, end, refs: [{ ...p.refs[0], label, at }] })));
+  if (fin(wl)) for (const end of [spec.panels[0].end, sq('g', last.thrustG), undefined]) for (const [label, at] of [[spec.panels[0].refs[0].label, 'l'], [spec.panels[0].refs[0].label, 'r'], [tr(per ? 'perf.short.weight' : 'perf.short.takeoff'), 'l'], [tr(per ? 'perf.short.weight' : 'perf.short.takeoff'), 'r']]) vs.push(withP(spec, 0, (p) => ({ ...p, end, refs: [{ ...p.refs[0], label, at }] })));
   return lineFig({
-    n: 4, key: 'throttle', title: w ? 'Cruise motor' : tilt ? 'Tilt-rotor throttle' : v ? 'Lift throttle' : 'Throttle curve', cap, spec, render: fit(vs.length ? vs : [spec]),
-    legend: K.ln(w ? 'Model curve, static' : 'Model curve') + (fin(hv) ? K.bd(w ? `Bench throttle at cruise power ${fmt(hv)}%${em}` : `${hn} throttle ${fmt(hv)}%`) : '') + (fin(wl) ? K.rf(per ? `Takeoff weight / ${N} motors, ${fmt(wl)} g` : `Takeoff weight ${fmt(wl)} g`) : ''),
-    tips: xTips(rows, 'pct', ['% throttle', 0], [['thrustG', 'Thrust', 'g', 0], ['powerW', 'Power', 'W', 0], ['currentA', 'Current', 'A', 1], ['gPerW', 'Efficiency', 'g/W', 2]]),
-    start: near(rows, 'pct', hv), table: table(`Fig 4. Throttle sweep${w ? ' (cruise motor, static)' : tilt ? ' (tilting rotors)' : v ? ' (lift motors)' : ''}`, COLS.throttle, rows),
+    n: 4, key: 'throttle', title: tr(w ? 'perf.title.cruiseMotor' : tilt ? 'perf.title.tiltThrottle' : v ? 'perf.title.liftThrottle' : 'perf.title.throttle') + (mc ? ' ' + tr('perf.measuredParen') : ''), cap, spec, render: fit(vs.length ? vs : [spec]),
+    legend: (mc ? K.ln(tr('perf.legend.measuredCurve')) + (hasOv ? K.sw(tr('perf.legend.modelledCurve'), PAL.ochre, true) : '') : K.ln(tr(w ? 'perf.legend.modelStatic' : 'perf.legend.model'))) + (fin(hv) ? K.bd(w ? tr('perf.legend.bench', { hv: fmt(hv), est: em }) : tr('perf.legend.hoverThrottle', { hn, hv: fmt(hv) })) : '') + (fin(wl) ? K.rf(per ? tr('perf.legend.weightN', { n: N, g: sq('g', wl) }) : tr('perf.legend.weight', { g: sq('g', wl) })) : ''),
+    tips: xTips(rows, 'pct', [tr('perf.tip.throttle'), 0], [['thrustG', tr('perf.thrust'), 'g', 0, 'g'], ['powerW', tr('perf.power'), 'W', 0], ['currentA', tr('perf.current'), 'A', 1], ['gPerW', tr('perf.efficiency'), 'g/W', 2, 'gw']])
+      .map((tp, i) => (hasOv ? { ...tp, r: [...tp.r, [sq('g', C.curve(mod, 'pct', 'thrustG').f(rows[i].pct)), tr('perf.tip.modelledThrust')]] } : tp)),
+    start: near(rows, 'pct', hv), table: table(tr('perf.throttle.table') + (mc ? ' ' + tr('perf.measuredParen') : '') + (w ? ' ' + tr('perf.throttle.tblWing') : tilt ? ' ' + tr('perf.throttle.tblTilt') : v ? ' ' + tr('perf.throttle.tblLift') : ''), COLS().throttle, rows),
   });
 }
 
 // [label, colour, striped]: blue = vertical flight, ochre = short high-power transients, teal = level flight;
 // stripes mark the low-power variant, so each phase of one profile gets its own mark.
 const PH = {
-  takeoff: ['Takeoff', 'blue'], hover: ['Hover', 'blue'], landing: ['Landing', 'blue'], climb: ['Climb', 'blue'], descent: ['Descent', 'blue', 1],
-  launch: ['Launch', 'ochre'], transition: ['Transition', 'ochre'], cruise: ['Cruise', 'teal'], loiter: ['Loiter', 'teal', 1], reserve: ['Reserve', ''],
+  takeoff: ['takeoff', 'blue'], hover: ['hover', 'blue'], landing: ['landing', 'blue'], climb: ['climb', 'blue'], descent: ['descent', 'blue', 1],
+  launch: ['launch', 'ochre'], transition: ['transition', 'ochre'], cruise: ['cruise', 'teal'], loiter: ['loiter', 'teal', 1], reserve: ['reserve', ''],
 };
 const HEAVY = new Set(['takeoff', 'hover', 'landing', 'transition', 'launch', 'climb']);
 function profile(r, P, mn) {
   const raw = (Array.isArray(P.profile) ? P.profile : []).filter((p) => p && typeof p.phase === 'string' && fin(p.startS) && fin(p.durationS) && p.durationS > 0 && fin(p.powerW) && p.powerW >= 0);
   if (!raw.length) return null;
   const ph = raw.sort((a, b) => a.startS - b.startS).map((p) => {
-    const [label, c, st] = PH[p.phase] || [up(p.phase), 'blue'];
+    const [id, c, st] = PH[p.phase] || [null, 'blue'], label = id ? tr(`perf.phase.${id}`) : up(p.phase); // text: perf.phase.<id>
     return { key: p.phase, label, color: PAL[c] || '', st: !!st, reserve: p.phase === 'reserve', t0: p.startS / 60, t1: (p.startS + p.durationS) / 60, w: p.powerW, s: p.durationS, wh: (p.powerW * p.durationS) / 3600, start: p.startS };
   });
   const tot = sum(ph.map((p) => p.wh)) || 1, flown = ph.filter((p) => !p.reserve), tf = sum(flown.map((p) => p.s)) || 1;
   const fly = fin(r.estFlightMin) ? r.estFlightMin : flown.length ? flown[flown.length - 1].t1 : NaN;
   const lift = flown.filter((p) => HEAVY.has(p.key)), cru = ph.find((p) => p.key === 'cruise'), loi = ph.find((p) => p.key === 'loiter'), hi = ph.reduce((a, b) => (b.w > a.w ? b : a));
   const share = (a, k) => fmt((sum(a.map((p) => p[k])) / (k === 's' ? tf : tot)) * 100), names = [...new Set(lift.map((p) => p.label.toLowerCase()))];
-  const cap = `Electrical power through the ${mn ? `${mn} ` : ''}mission, phase by phase. Peak draw ${fmt(hi.w)} W (${hi.label.toLowerCase()}).` +
-    (lift.length && cru ? ` ${up(and(names))} take${names.length > 1 ? '' : 's'} ${share(lift, 's')}% of the flight time ${Math.abs(share(lift, 's') - share(lift, 'wh')) <= 1 ? 'and' : 'but'} ${share(lift, 'wh')}% of the energy; cruise runs at ${fmt(cru.w)} W${loi ? `, loiter at ${fmt(loi.w)} W` : ''}.` : '') +
-    (ph.some((p) => p.reserve) ? ' The reserve (hatched) stays in the pack.' : '');
+  const cap = tr(mn ? 'perf.profile.cap' : 'perf.profile.capPlain', { mission: mn, w: fmt(hi.w), phase: hi.label.toLowerCase() }) +
+    (lift.length && cru ? ' ' + tr('perf.profile.lift', { count: names.length, names: up(and(names)), ts: share(lift, 's'), joint: tr(Math.abs(share(lift, 's') - share(lift, 'wh')) <= 1 ? 'perf.profile.and' : 'perf.profile.but'), es: share(lift, 'wh'), cw: fmt(cru.w), loiter: loi ? tr('perf.profile.loiter', { w: fmt(loi.w) }) : '' }) : '') +
+    (ph.some((p) => p.reserve) ? ' ' + tr('perf.profile.reserveNote') : '');
   const kinds = new Map(); // one legend entry per mark, in flight order
   for (const p of ph) if (!p.reserve) { const k = `${p.color}|${p.st ? 1 : ''}`; kinds.set(k, [...(kinds.get(k) || []), p.label]); }
   return {
-    n: 5, key: 'profile', title: 'Mission profile', kind: 'seg', cap,
-    render: (w, id) => C.phases({ phases: ph, mark: fin(fly) ? { x: fly, label: `Flight ${fmt(fly, 1)} min` } : null, x: { label: 'Mission time', unit: 'min' } }, w, id),
-    legend: [...kinds].map(([k, l]) => K.sw([...new Set(l)].join(', '), k.split('|')[0], k.endsWith('1'))).join('') + (ph.some((p) => p.reserve) ? K.hr('Reserve, not flown') : '') + (fin(fly) ? K.bd(`Flight time ${fmt(fly, 1)} min`) : ''),
-    tips: ph.map((p) => ({ h: p.label, c: p.color, st: p.st, r: [[`${fmt(p.w)} W`, 'Power'], [dur(p.s), 'Duration'], [`${fmt(p.wh, 1)} Wh`, 'Energy'], [`${fmt((p.wh / tot) * 100)}%`, 'Share of energy']] })),
+    n: 5, key: 'profile', title: tr('perf.title.profile'), kind: 'seg', cap,
+    render: (w, id) => C.phases({ phases: ph, mark: fin(fly) ? { x: fly, label: tr('perf.profile.flight', { min: fmt(fly, 1) }) } : null, x: { label: tr('perf.profile.time'), unit: 'min' } }, w, id),
+    legend: [...kinds].map(([k, l]) => K.sw([...new Set(l)].join(', '), k.split('|')[0], k.endsWith('1'))).join('') + (ph.some((p) => p.reserve) ? K.hr(tr('perf.profile.notFlown')) : '') + (fin(fly) ? K.bd(tr('perf.profile.flightTime', { min: fmt(fly, 1) })) : ''),
+    tips: ph.map((p) => ({ h: p.label, c: p.color, st: p.st, r: [[`${fmt(p.w)} W`, tr('perf.power')], [dur(p.s), tr('perf.profile.duration')], [`${fmt(p.wh, 1)} Wh`, tr('perf.profile.energy')], [`${fmt((p.wh / tot) * 100)}%`, tr('perf.profile.share')]] })),
     start: Math.max(0, ph.findIndex((p) => p.key === 'cruise')),
-    table: { title: 'Fig 5. Mission profile', columns: ['Phase', 'Start (s)', 'Duration (s)', 'Power (W)', 'Energy (Wh)'], rows: ph.map((p) => [p.label, fmt(p.start), fmt(p.s), fmt(p.w), fmt(p.wh, 1)]) },
+    table: { title: tr('perf.profile.table'), columns: [tr('perf.profile.phase'), tr('perf.profile.start'), tr('perf.profile.durationS'), tr('perf.col.power'), tr('perf.profile.energyWh')], rows: ph.map((p) => [p.label, fmt(p.start), fmt(p.s), fmt(p.w), fmt(p.wh, 1)]) },
   };
 }
 
-const WN = { measuredExtraG: 'Measured, not in the estimate', frameG: 'Frame', airframeG: 'Airframe', motorsG: 'Motors', escG: 'ESC', fcG: 'FC', propsG: 'Props', servosG: 'Servos', tiltG: 'Tilt mechanism', hardwareG: 'Screws, wiring and hardware', otherG: 'Other', payloadG: 'Payload', batteryG: 'Battery' };
-const wname = (k, v, w) => (k === 'frameG' && v && !w?.airframeG ? 'Airframe' : WN[k] || up(k.replace(/G$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()));
+const WN = new Set(['measuredExtraG', 'frameG', 'airframeG', 'motorsG', 'escG', 'fcG', 'propsG', 'servosG', 'tiltG', 'hardwareG', 'otherG', 'payloadG', 'batteryG']); // text: perf.w.<id>
+const wname = (k, v, w) => (k === 'frameG' && v && !w?.airframeG ? tr('perf.w.airframeG') : WN.has(k) ? tr(`perf.w.${k}`) : up(k.replace(/G$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()));
 function weights(r, v) { // v: any wing data (vtol or fixed wing) -> the frame is an airframe
   const w = r.weights && typeof r.weights === 'object' ? r.weights : {};
   const all = Object.entries(w).filter(([, g]) => fin(g) && g > 0);
   if (!all.length) return null;
   const dry = all.filter(([k]) => k !== 'payloadG' && k !== 'batteryG').sort((a, b) => (a[0] === 'measuredExtraG') - (b[0] === 'measuredExtraG') || b[1] - a[1]); // the measured excess last
-  const parts = [...dry.map(([k, g]) => ({ label: wname(k, v, w), g, color: PAL.blue, grp: 'Dry weight' })),
-    ...all.filter(([k]) => k === 'payloadG').map(([, g]) => ({ label: 'Payload', g, color: PAL.teal, grp: 'Payload' })),
-    ...all.filter(([k]) => k === 'batteryG').map(([, g]) => ({ label: 'Battery', g, color: PAL.ochre, grp: 'Battery' }))];
+  const parts = [...dry.map(([k, g]) => ({ label: wname(k, v, w), g, color: PAL.blue, grp: 'dry' })),
+    ...all.filter(([k]) => k === 'payloadG').map(([, g]) => ({ label: tr('perf.grp.payload'), g, color: PAL.teal, grp: 'payload' })),
+    ...all.filter(([k]) => k === 'batteryG').map(([, g]) => ({ label: tr('perf.grp.battery'), g, color: PAL.ochre, grp: 'battery' }))];
   const total = sum(parts.map((p) => p.g)), pc = (g) => fmt((g / total) * 100);
   const groups = [];
   let a = 0;
-  for (const p of parts) { const g = groups[groups.length - 1]; if (g?.grp === p.grp) g.b += p.g; else groups.push({ grp: p.grp, label: p.grp === 'Dry weight' ? 'Dry' : p.grp, a, b: a + p.g }); a += p.g; }
-  const cap = `Takeoff mass ${fmt(total)} g: ${groups.map((g) => `${g.grp.toLowerCase()} ${fmt(g.b - g.a)} g (${pc(g.b - g.a)}%)`).join(', ')}.` +
-    (w.batteryG > 0 ? ` The battery is ${pc(w.batteryG)}% of takeoff mass.` : '') +
-    (dif(r) ? (w.measuredExtraG > 0 ? ` The measured ${fmt(r.measuredG)} g is ${fmt(w.measuredExtraG)} g over the estimate.` : ` The measured ${fmt(r.measuredG)} g is ${fmt(r.estG - r.measuredG)} g under the estimate; the breakdown is the estimate's.`) : '');
+  for (const p of parts) { const g = groups[groups.length - 1]; if (g?.grp === p.grp) g.b += p.g; else groups.push({ grp: p.grp, name: tr(`perf.grp.${p.grp}`), label: tr(p.grp === 'dry' ? 'perf.grp.dryShort' : `perf.grp.${p.grp}`), a, b: a + p.g }); a += p.g; }
+  const cap = tr('perf.weights.cap', { total: sq('g', total), groups: groups.map((g) => tr('perf.weights.group', { name: g.name.toLowerCase(), g: sq('g', g.b - g.a), pc: pc(g.b - g.a) })).join(', ') }) +
+    (w.batteryG > 0 ? ' ' + tr('perf.weights.battery', { pc: pc(w.batteryG) }) : '') +
+    (dif(r) ? ' ' + (w.measuredExtraG > 0 ? tr('perf.weights.over', { m: sq('g', r.measuredG), x: sq('g', w.measuredExtraG) }) : tr('perf.weights.under', { m: sq('g', r.measuredG), x: sq('g', r.estG - r.measuredG) })) : '');
   return {
-    n: 6, key: 'weights', title: dif(r) && !(w.measuredExtraG > 0) ? 'Weight statement (estimate)' : 'Weight statement', kind: 'seg', cap,
+    n: 6, key: 'weights', title: tr(dif(r) && !(w.measuredExtraG > 0) ? 'perf.weights.titleEst' : 'perf.title.weights'), kind: 'seg', cap,
     render: (wd) => C.massBar({ parts, groups, total }, wd),
-    legend: groups.map((g) => K.sw(g.grp, parts.find((p) => p.grp === g.grp).color)).join(''),
-    extra: `<ol class="pf-ws">${parts.map((p) => `<li><i class="k-sw" style="--c:${p.color}"></i><span>${esc(p.label)}</span><b>${fmt(p.g)} g</b><small>${pc(p.g)}%</small></li>`).join('')}</ol>`,
-    tips: parts.map((p) => ({ h: p.label, c: p.color, r: [[`${fmt(p.g)} g`, 'Mass'], [`${pc(p.g)}%`, 'of takeoff mass'], [p.grp, 'Group']] })),
+    legend: groups.map((g) => K.sw(g.name, parts.find((p) => p.grp === g.grp).color)).join(''),
+    extra: `<ol class="pf-ws">${parts.map((p) => `<li><i class="k-sw" style="--c:${p.color}"></i><span>${esc(p.label)}</span><b>${sq('g', p.g)}</b><small>${pc(p.g)}%</small></li>`).join('')}</ol>`,
+    tips: parts.map((p) => ({ h: p.label, c: p.color, r: [[sq('g', p.g), tr('perf.weights.mass')], [`${pc(p.g)}%`, tr('perf.weights.ofMass')], [tr(`perf.grp.${p.grp}`), tr('perf.weights.group2')]] })),
     start: 0,
-    table: { title: 'Fig 6. Weight breakdown', columns: ['Component', 'Mass (g)', 'Share (%)'], rows: parts.map((p) => [p.label, fmt(p.g), pc(p.g)]) },
+    table: { title: tr('perf.weights.table'), columns: [tr('perf.weights.component'), tr('perf.weights.massCol', { unit: U.label('g') }), tr('perf.weights.share')], rows: parts.map((p) => [p.label, fq('g', p.g), pc(p.g)]) },
   };
 }
 
 // Key figures, [label, value, unit, note]. Quadplane and tiltrotor share the VTOL rows; the tiltrotor adds its tilt mechanism.
 const wingRows = (v) => [
-  ['Span', fin(v.wingspanMm) && fmt(v.wingspanMm / 1000, 2), 'm', fin(v.aspectRatio) ? `aspect ratio ${fmt(v.aspectRatio, 1)}${fin(v.wingAreaDm2) ? `, ${fmt(v.wingAreaDm2, 1)} dm²` : ''}` : ''],
-  ['Wing loading', fin(v.wingLoadingGdm2) && fmt(v.wingLoadingGdm2), 'g/dm²', ''],
-  ['Lift : drag', fin(v.liftToDrag) && fmt(v.liftToDrag, 1), '', fin(v.liftToDrag) ? `glides ${fmt(v.liftToDrag)} m per m of height` : ''],
-  ['Stall', fin(v.stallMs) && fmt(v.stallMs, 1), 'm/s', ''],
-  ['Cruise', fin(v.cruiseMs) && fmt(v.cruiseMs, 1), 'm/s', fin(v.cruiseMs) && fin(v.stallMs) && v.stallMs > 0 ? `${fmt(v.cruiseMs / v.stallMs, 2)}x stall` : ''],
+  [tr('perf.kf.span'), fin(v.wingspanMm) && fq('m', v.wingspanMm / 1000, 2), U.label('m'), fin(v.aspectRatio) ? tr('perf.kf.aspect', { ar: fmt(v.aspectRatio, 1) }) + (fin(v.wingAreaDm2) ? `, ${sq('dm2', v.wingAreaDm2, 1)}` : '') : ''],
+  [tr('perf.kf.loading'), fin(v.wingLoadingGdm2) && fq('gdm2', v.wingLoadingGdm2), U.label('gdm2'), ''],
+  [tr('perf.kf.ld'), fin(v.liftToDrag) && fmt(v.liftToDrag, 1), '', fin(v.liftToDrag) ? tr('perf.kf.glides', { n: fmt(v.liftToDrag) }) : ''],
+  [tr('perf.stall'), fin(v.stallMs) && fq('ms', v.stallMs, 1), U.label('ms'), ''],
+  [tr('perf.cruise'), fin(v.cruiseMs) && fq('ms', v.cruiseMs, 1), U.label('ms'), fin(v.cruiseMs) && fin(v.stallMs) && v.stallMs > 0 ? tr('perf.kf.xStall', { x: fmt(v.cruiseMs / v.stallMs, 2) }) : ''],
 ];
-const LAUNCH = { hand: 'Hand', bungee: 'Bungee', runway: 'Runway' };
+const LAUNCH = lazyMap('perf.launch.', ['hand', 'bungee', 'runway']);
 function keyRows(r) {
   const w = r?.fixedWing, v = r?.vtol;
   if (w && typeof w === 'object') {
     const rows = [...wingRows(w),
-      ['Launch', typeof w.launch === 'string' && (LAUNCH[w.launch] || up(w.launch)), '', dif(r) ? 'type at estimated mass' : fin(r.auwKg) ? `takeoff mass ${fmt(r.auwKg, 2)} kg` : ''],
-      ['Endurance', fin(r.estFlightMin) && kn(r.estFlightMin, 1), 'min', 'at cruise speed'], // same figure as the KPI tile
-      ['Range', fin(r.rangeKm) && kn(r.rangeKm, 1), 'km', fin(w.cruiseMs) ? `at ${fmt(w.cruiseMs, 1)} m/s` : ''],
+      [tr('perf.kf.launch'), typeof w.launch === 'string' && (LAUNCH[w.launch] || up(w.launch)), '', dif(r) ? tr('perf.kf.typeEst') : fin(r.auwKg) ? tr('perf.kf.takeoffMass', { m: sq('kg', r.auwKg, 2) }) : ''],
+      [tr('perf.endurance'), fin(r.estFlightMin) && kn(r.estFlightMin, 1), 'min', tr('perf.kf.atCruise')], // same figure as the KPI tile
+      [tr('perf.range'), fin(r.rangeKm) && U.num('km', r.rangeKm, 1), U.label('km'), fin(w.cruiseMs) ? tr('perf.kf.at', { v: sq('ms', w.cruiseMs, 1) }) : ''],
     ].filter((c) => c[1]);
-    return { kind: 'wing', tag: 'Fixed wing', title: 'Wing / tilt', rows, a: w };
+    return { kind: 'wing', tag: tr('perf.kf.tagWing'), title: tr('perf.kf.titleWing'), rows, a: w };
   }
   if (!v || typeof v !== 'object') return null;
   const hs = (fin(v.hoverS) ? v.hoverS : 0) + (fin(v.transitionS) ? v.transitionS : 0), t = v.type === 'tiltrotor' && v.tilt && typeof v.tilt === 'object' ? v.tilt : null;
   const rows = [...wingRows(v),
-    ['Hover vs cruise', hs > 0 && fin(v.cruiseMin) && `${fmt(hs / 60, 1)} / ${fmt(v.cruiseMin, 1)}`, 'min', dif(r) ? 'at estimated mass' : fin(v.hoverS) && fin(v.transitionS) ? `${fmt(v.hoverS)} s hover, ${fmt(v.transitionS)} s transition` : ''],
+    [tr('perf.kf.hoverCruise'), hs > 0 && fin(v.cruiseMin) && `${fmt(hs / 60, 1)} / ${fmt(v.cruiseMin, 1)}`, 'min', dif(r) ? tr('perf.kf.atEst') : fin(v.hoverS) && fin(v.transitionS) ? tr('perf.kf.hoverTrans', { h: fmt(v.hoverS), t: fmt(v.transitionS) }) : ''],
     ...(t ? [
-      ['Tilt servos', fin(t.servoCount) && fmt(t.servoCount), '', fin(t.motorCount) ? `${fmt(t.motorCount)} tilting motors, no pusher` : ''],
-      ['Tilt time', fin(t.tiltTimeS) && fmt(t.tiltTimeS, 1), 's', 'hover to cruise'],
-      ['Transition angle', fin(t.transitionAngleDeg) && `${fmt(t.transitionAngleDeg)}°`, '', 'rotor tilt from vertical thrust'],
+      [tr('perf.kf.tiltServos'), fin(t.servoCount) && fmt(t.servoCount), '', fin(t.motorCount) ? tr('perf.kf.tiltMotors', { n: fmt(t.motorCount) }) : ''],
+      [tr('perf.kf.tiltTime'), fin(t.tiltTimeS) && fmt(t.tiltTimeS, 1), 's', tr('perf.kf.hoverToCruise')],
+      [tr('perf.kf.transAngle'), fin(t.transitionAngleDeg) && `${fmt(t.transitionAngleDeg)}°`, '', tr('perf.kf.rotorTilt')],
     ] : []),
   ].filter((c) => c[1]);
-  return v.type === 'tiltrotor' ? { kind: 'tilt', tag: 'Tiltrotor', title: 'Wing / tilt', rows, a: v, tilt: t } : { kind: 'quadplane', tag: 'VTOL', title: 'VTOL key figures', rows, a: v };
+  return v.type === 'tiltrotor' ? { kind: 'tilt', tag: tr('perf.kf.tagTilt'), title: tr('perf.kf.titleWing'), rows, a: v, tilt: t } : { kind: 'quadplane', tag: tr('perf.kf.tagVtol'), title: tr('perf.kf.titleVtol'), rows, a: v };
 }
 function keyStrip(r) {
   const k = keyRows(r);
@@ -303,16 +314,16 @@ function keyStrip(r) {
   const v = k.a, ga = fin(v.wingspanMm) && fin(v.wingAreaDm2) && v.wingspanMm > 0 && v.wingAreaDm2 > 0;
   const bar = k.kind !== 'wing' && fin(v.hoverS) && fin(v.cruiseMin) ? `<span class="pf-hb" aria-hidden="true">${[[v.hoverS, PAL.blue], [v.transitionS, PAL.ochre], [v.cruiseMin * 60, PAL.teal]].filter(([s]) => fin(s) && s > 0).map(([s, c]) => `<i style="flex:${s.toFixed(1)};--c:${c}"></i>`).join('')}</span>` : '';
   const svg = () => C.planform(v, { kind: k.kind, liftIn: r.propInch, pushIn: v.pusher?.propInch, propIn: v.motor?.propInch ?? r.propInch, tiltDeg: k.tilt?.transitionAngleDeg });
-  const note = { wing: 'fuselage, tail and motor schematic.', tilt: 'booms schematic; tilt axes dash-dotted, the inset shows the rotor tilt.', quadplane: 'fuselage and booms schematic.' }[k.kind];
+  const note = tr({ wing: 'perf.kf.noteWing', tilt: 'perf.kf.noteTilt', quadplane: 'perf.kf.noteQuad' }[k.kind]);
   let fig = '';
-  try { fig = ga ? `<figure class="pf-ga">${svg()}<figcaption>Planform to scale from span and wing area; ${note}</figcaption></figure>` : ''; } catch { fig = ''; }
-  return `<div class="pf-vt"><h4 class="pf-t"><em>${esc(k.tag.toUpperCase())}</em>Key figures</h4><div class="pf-vt-in">${fig}` +
-    `<dl class="pf-kf">${k.rows.map(([l, val, u, s]) => { const hv = l === 'Hover vs cruise' && bar; return `<div${hv ? ' class="hv"' : ''}><dt>${esc(l)}</dt><dd>${esc(val)}${u ? `<small>${esc(u)}</small>` : ''}</dd>${s ? `<dd class="s">${esc(s)}</dd>` : ''}${hv ? bar : ''}</div>`; }).join('')}</dl></div></div>`;
+  try { fig = ga ? `<figure class="pf-ga">${svg()}<figcaption>${esc(tr('perf.kf.planform', { note }))}</figcaption></figure>` : ''; } catch { fig = ''; }
+  return `<div class="pf-vt"><h4 class="pf-t"><em>${esc(k.tag.toUpperCase())}</em>${esc(tr('perf.kf.title'))}</h4><div class="pf-vt-in">${fig}` +
+    `<dl class="pf-kf">${k.rows.map(([l, val, u, s]) => { const hv = l === tr('perf.kf.hoverCruise') && bar; return `<div${hv ? ' class="hv"' : ''}><dt>${esc(l)}</dt><dd>${esc(val)}${u ? `<small>${esc(u)}</small>` : ''}</dd>${s ? `<dd class="s">${esc(s)}</dd>` : ''}${hv ? bar : ''}</div>`; }).join('')}</dl></div></div>`;
 }
 
-const TITLES = ['Speed polar', 'Payload sweep', 'Battery sweep', 'Throttle curve', 'Mission profile', 'Weight statement'];
+const TKEYS = ['speed', 'payload', 'battery', 'throttle', 'profile', 'weights'], TITLE = (i) => tr(`perf.title.${TKEYS[i]}`);
 // Mission name for captions; an FPV class names itself once: "FPV · 5 in freestyle / racing".
-const missionName = (r, ctx) => { const f = fpvOf(r); return f ? `FPV · ${f.label}` : ctx.missionLabel || ''; };
+const missionName = (r, ctx) => { const f = fpvOf(r); return f ? tr('perf.fpvMission', { label: f.label }) : ctx.missionLabel || ''; };
 function figures(r, ctx = {}) {
   if (!r || typeof r !== 'object' || r.ok === false) return [];
   const P = r.performance && typeof r.performance === 'object' ? r.performance : {}, v = r.vtol && typeof r.vtol === 'object' ? r.vtol : null;
@@ -323,13 +334,13 @@ function figures(r, ctx = {}) {
   const make = [() => speed(r, P, v, w), () => payload(r, P, minTWR, mn, !!w), () => battery(r, P, minTWR), () => throttle(r, P, v, w), () => profile(r, P, mn), () => weights(r, w || v)];
   // Measured weight: speed polar, battery sweep and mission profile cannot be re-derived from one mass, so they say they are the estimate's.
   const est = dif(r) ? new Set(['speed', 'battery', 'profile']) : null;
-  const tag = (m) => (m && !m.miss && est?.has(m.key) ? { ...m, title: `${m.title} (estimate)`, cap: `At the estimated ${fmt(r.estG)} g takeoff mass, not the measured ${fmt(r.measuredG)} g. ${m.cap}` } : m);
-  return make.map((f, i) => { try { return tag(f()) || { n: i + 1, miss: TITLES[i] }; } catch { return { n: i + 1, miss: TITLES[i] }; } });
+  const tag = (m) => (m && !m.miss && est?.has(m.key) ? { ...m, title: `${m.title} ${tr('perf.estimateParen')}`, cap: `${tr('perf.estCap', { est: sq('g', r.estG), meas: sq('g', r.measuredG) })} ${m.cap}` } : m);
+  return make.map((f, i) => { try { return tag(f()) || { n: i + 1, miss: TITLE(i) }; } catch { return { n: i + 1, miss: TITLE(i) }; } });
 }
 
 export function perfTables(result) {
   const t = figures(result).filter((f) => f.table).map((f) => f.table), k = result && typeof result === 'object' ? keyRows(result) : null;
-  return k?.rows.length ? [...t, { title: k.title, columns: ['Quantity', 'Value', 'Note'], rows: k.rows.map(([l, val, u, s]) => [l, u ? `${val} ${u}` : val, s || '']) }] : t;
+  return k?.rows.length ? [...t, { title: k.title, columns: [tr('perf.kf.quantity'), tr('perf.kf.value'), tr('perf.kf.note')], rows: k.rows.map(([l, val, u, s]) => [l, u ? `${val} ${u}` : val, s || '']) }] : t;
 }
 
 const REG = new Map(); // figure id -> model, waiting for bindPerformance (render runs before the DOM exists)
@@ -338,25 +349,25 @@ const tableHtml = (t, hi) => `<div class="pf-tw"><table><caption class="pf-sr">$
 
 export function renderPerformance(result, ctx = {}) {
   const figs = figures(result, ctx || {});
-  if (!figs.length) return '<p class="pf-note">Performance figures appear once the build calculates.</p>';
+  if (!figs.length) return `<p class="pf-note">${esc(tr('perf.empty'))}</p>`;
   const uid = `pf${(++SEQ).toString(36)}`, W0 = ctx?.width >= 160 ? ctx.width : 560; // ctx.width: tests draw at narrow plot widths
-  const miss = (n) => `<div class="pf pf-miss"><p><em>FIG ${n}</em>${esc(TITLES[n - 1])}: this series is not in the result yet.</p></div>`;
+  const miss = (n) => `<div class="pf pf-miss"><p><em>${esc(tr('perf.fig', { n }))}</em>${esc(tr('perf.missing', { title: TITLE(n - 1) }))}</p></div>`;
   const body = figs.map((m) => {
     if (m.miss) return miss(m.n);
     let o;
     try { o = m.render(W0, `${uid}-${m.key}`); } catch { return miss(m.n); }
-    const id = `${uid}-${m.key}`, aria = `Figure ${m.n}, ${m.title}. ${m.cap}${m.kind === 'x' ? ' Arrow keys step through the data points.' : ' Arrow keys step through the segments.'}`;
+    const id = `${uid}-${m.key}`, aria = tr('perf.aria', { n: m.n, title: m.title, what: tr(m.kind === 'x' ? 'perf.aria.points' : 'perf.aria.segments') }); // the long summary is the visible figcaption, tied by aria-describedby
     Object.assign(m, { id, w: W0, geo: o.geo, idx: null });
     REG.set(id, m);
-    return `<figure class="pf" data-uid="${id}"><div class="pf-box"><div class="pf-head"><h4 class="pf-t"><em>FIG ${m.n}</em>${esc(m.title)}</h4>` +
-      `<div class="pf-tools"><button type="button" class="pf-btn" data-pf="table" aria-expanded="false" aria-controls="${id}-t">Table</button><button type="button" class="pf-btn" data-pf="csv">Copy CSV</button></div></div>` +
-      `<ul class="pf-key">${m.legend}</ul><div class="pf-plot"><svg class="pf-svg" role="img" tabindex="0" aria-label="${esc(aria)}" viewBox="0 0 ${o.w} ${o.h}" width="${o.w}" height="${o.h}">${o.inner}</svg><div class="pf-tip" aria-hidden="true"></div></div>` +
+    return `<figure class="pf" data-uid="${id}"><div class="pf-box"><div class="pf-head"><h4 class="pf-t"><em>${esc(tr('perf.fig', { n: m.n }))}</em>${esc(m.title)}</h4>` +
+      `<div class="pf-tools"><button type="button" class="pf-btn" data-pf="table" aria-expanded="false" aria-controls="${id}-t">${esc(tr('perf.table'))}</button><button type="button" class="pf-btn" data-pf="csv">${esc(tr('perf.copyCsv'))}</button></div></div>` +
+      `<ul class="pf-key">${m.legend}</ul><div class="pf-plot"><svg class="pf-svg" role="img" tabindex="0" aria-label="${esc(aria)}" aria-describedby="${id}-c" viewBox="0 0 ${o.w} ${o.h}" width="${o.w}" height="${o.h}">${o.inner}</svg><div class="pf-tip" aria-hidden="true"></div></div>` +
       `${m.extra || ''}<div class="pf-tbl" id="${id}-t" hidden>${tableHtml(m.table, m.kind === 'x' ? m.start : -1)}</div></div>` +
-      `<figcaption><b>Fig ${m.n}.</b> ${esc(m.cap)}</figcaption><p class="pf-sr" aria-live="polite"></p></figure>`;
+      `<figcaption id="${id}-c"><b>${esc(tr('perf.figDot', { n: m.n }))}</b> ${esc(m.cap)}</figcaption><p class="pf-sr" aria-live="polite"></p></figure>`;
   }).join('');
   while (REG.size > 48) REG.delete(REG.keys().next().value);
-  const mn = missionName(result, ctx || {}), who = mn ? ` for this ${esc(mn)} build` : '';
-  return `<div class="pf-sec"><p class="pf-lede">Model curves${who}. Point at, tap or focus a figure, then use the arrow keys for exact values.</p>${keyStrip(result)}<div class="pf-grid">${body}</div></div>`;
+  const mn = missionName(result, ctx || {});
+  return `<div class="pf-sec"><p class="pf-lede">${esc(mn ? tr('perf.ledeFor', { mission: mn }) : tr('perf.lede'))}</p>${keyStrip(result)}<div class="pf-grid">${body}</div></div>`;
 }
 
 // ---------- interaction (browser only) ----------
@@ -505,8 +516,8 @@ async function onClick(e) {
     try { ok = document.execCommand('copy'); } catch { ok = false; }
     ta.remove();
   }
-  b.textContent = ok ? 'Copied' : 'Copy failed';
-  if (live) live.textContent = ok ? 'CSV copied to the clipboard.' : 'Copy failed. Open the table to select the values.';
+  b.textContent = ok ? tr('perf.copied') : tr('perf.copyFailed');
+  if (live) live.textContent = ok ? tr('perf.copiedLive') : tr('perf.copyFailedLive');
   clearTimeout(b._t);
-  b._t = setTimeout(() => { b.textContent = 'Copy CSV'; }, 1800);
+  b._t = setTimeout(() => { b.textContent = tr('perf.copyCsv'); }, 1800);
 }

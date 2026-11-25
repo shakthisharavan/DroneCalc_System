@@ -3,37 +3,44 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; worker-src 'self'; manifest-src 'self'">
+<meta name="theme-color" content="#e9e4d4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c2024" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="DroneCalc">
+<meta name="mobile-web-app-capable" content="yes">
 <title>DroneCalc - Drone calculator and bill of materials</title>
-<meta name="description" content="DroneCalc, the drone calculator and bill of materials: answer four questions about your mission and get weight, power, flight time, matched parts with local buy links in your currency, and a PDF bill of materials.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%2314181c' stroke-width='3'/%3E%3Cpath d='M16 2v28M2 16h28' stroke='%23b53a08' stroke-width='3'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75,600..800&family=Atkinson+Hyperlegible+Next:wght@400..600&family=JetBrains+Mono:wght@400..600&display=swap" rel="stylesheet">
+<meta name="description" data-i18n-attr="content:page.description" content="DroneCalc, the drone calculator and bill of materials: answer four questions about your mission and get weight, power, flight time, matched parts with local buy links in your currency, and a PDF bill of materials.">
+<link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%2314181c' stroke-width='3'/%3E%3Cpath d='M16 2v28M2 16h28' stroke='%23b53a08' stroke-width='3'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/main.css">
 <link rel="stylesheet" href="css/perf.css">
 </head>
 <body>
-<a class="skip" href="#main">Skip to content</a>
+<a class="skip" href="#main" data-i18n="page.skip">Skip to main content</a>
 <header class="mast">
   <div class="mast-id">
     <span class="mast-mark" aria-hidden="true"></span>
     <h1>DroneCalc</h1>
   </div>
-  <p class="mast-sub">Drone calculator and bill of materials &middot; Form DC-2 &middot; Rev. 2026-11</p>
-  <button type="button" class="lib-tog" aria-expanded="false" aria-controls="lib">My builds</button>
-  <button type="button" class="theme-tog" aria-pressed="false"><span class="sr">Dark theme</span></button>
+  <p class="mast-sub" data-i18n="page.mastSub">Drone calculator and bill of materials &middot; Form DC-2 &middot; Rev. 2026-11</p>
+  <button type="button" class="lib-tog" aria-expanded="false" aria-controls="lib" data-i18n="lib.title">My builds</button>
+  <div class="unit-tog" role="group" aria-label="Display units" data-i18n-attr="aria-label:page.units"><button type="button" data-u="metric" aria-pressed="true" aria-label="Metric units: grams, metres, Celsius" data-i18n="page.metric" data-i18n-attr="aria-label:page.metricAria">Metric</button><button type="button" data-u="imperial" aria-pressed="false" aria-label="Imperial units: ounces, feet, Fahrenheit" data-i18n="page.imperial" data-i18n-attr="aria-label:page.imperialAria">Imperial</button></div>
+  <div class="lang-tog"><label for="lang" data-i18n="page.language">Language</label><select id="lang" name="lang"><option value="en" lang="en">English</option><option value="es" lang="es">Español</option><option value="hi" lang="hi">हिन्दी</option></select></div>
+  <button type="button" class="theme-tog" aria-pressed="false"><span class="sr" data-i18n="page.darkTheme">Dark theme</span></button>
 </header>
-<aside class="lib" id="lib" aria-labelledby="lib-h" hidden></aside>
+<div class="lib" id="lib" role="dialog" aria-modal="true" aria-labelledby="lib-h" hidden></div>
 
 <div class="shell" id="shell">
-  <main id="main" class="stage" tabindex="-1"></main>
-  <aside class="panel" id="panel" aria-label="Live readout"></aside>
+  <main id="main" class="stage" tabindex="-1"><p class="lede">DroneCalc needs JavaScript and a current browser (Chrome or Edge 93+, Firefox 92+, Safari 15.4+). If this message stays on screen, turn JavaScript on or update your browser. The app replaces this text as soon as it starts.</p></main>
+  <aside class="panel" id="panel" aria-label="Live readout" data-i18n-attr="aria-label:app.liveReadout"></aside>
 </div>
 
 <footer class="foot">
-  <p>Estimates use momentum theory with fixed efficiency assumptions. Verify with a bench test before flight. Prices and links checked 2026-11-06 and may drift; converted prices use approximate exchange rates.</p>
+  <p data-i18n="page.foot">Estimates use momentum theory with fixed efficiency assumptions. Verify with a bench test before flight. Prices and links checked 2026-11-06 and may drift; converted prices use approximate exchange rates.</p>
 </footer>
+<p class="sr noprint" id="sr-live" role="status"></p>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

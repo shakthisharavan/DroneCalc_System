@@ -7,64 +7,68 @@
 // v4 (2026-11-08): specs.connector on batteries and ESCs (stock lead; "pads" = bare leads, solder your own), ESC minCells,
 // frame maxPropInch (adjacent motor spacing less ~1 in clearance; FPV frames per maker). Pixhawk bundle connector = its power module input.
 
+import { t } from "./i18n/i18n.js";
+
 // Mid-market rates from open.er-api.com on 2026-11-06, cross-checked with the ECB rates (frankfurter.dev, 2026-11-05).
 export const CURRENCIES = {
-  USD: { name: "US dollar", symbol: "$", perUsd: 1, decimals: 2 },
-  EUR: { name: "Euro", symbol: "€", perUsd: 0.8905, decimals: 2 },
-  GBP: { name: "British pound", symbol: "£", perUsd: 0.7429, decimals: 2 },
-  INR: { name: "Indian rupee", symbol: "₹", perUsd: 94.54, decimals: 2 },
-  CAD: { name: "Canadian dollar", symbol: "CA$", perUsd: 1.399, decimals: 2 },
-  AUD: { name: "Australian dollar", symbol: "A$", perUsd: 1.438, decimals: 2 },
-  AED: { name: "UAE dirham", symbol: "AED", perUsd: 3.6725, decimals: 2 },
-  SGD: { name: "Singapore dollar", symbol: "S$", perUsd: 1.278, decimals: 2 },
-  JPY: { name: "Japanese yen", symbol: "¥", perUsd: 157.8, decimals: 0 },
-  CNY: { name: "Chinese yuan", symbol: "CN¥", perUsd: 6.683, decimals: 2 },
-  CHF: { name: "Swiss franc", symbol: "CHF", perUsd: 0.8162, decimals: 2 },
-  ZAR: { name: "South African rand", symbol: "R", perUsd: 16.45, decimals: 2 },
-  BRL: { name: "Brazilian real", symbol: "R$", perUsd: 5.468, decimals: 2 },
-  SAR: { name: "Saudi riyal", symbol: "SAR", perUsd: 3.75, decimals: 2 },
-  NZD: { name: "New Zealand dollar", symbol: "NZ$", perUsd: 1.784, decimals: 2 },
-  KRW: { name: "South Korean won", symbol: "₩", perUsd: 1348, decimals: 0 },
-  MYR: { name: "Malaysian ringgit", symbol: "RM", perUsd: 4.046, decimals: 2 },
+  USD: { symbol: "$", perUsd: 1, decimals: 2 },
+  EUR: { symbol: "€", perUsd: 0.8905, decimals: 2 },
+  GBP: { symbol: "£", perUsd: 0.7429, decimals: 2 },
+  INR: { symbol: "₹", perUsd: 94.54, decimals: 2 },
+  CAD: { symbol: "CA$", perUsd: 1.399, decimals: 2 },
+  AUD: { symbol: "A$", perUsd: 1.438, decimals: 2 },
+  AED: { symbol: "AED", perUsd: 3.6725, decimals: 2 },
+  SGD: { symbol: "S$", perUsd: 1.278, decimals: 2 },
+  JPY: { symbol: "¥", perUsd: 157.8, decimals: 0 },
+  CNY: { symbol: "CN¥", perUsd: 6.683, decimals: 2 },
+  CHF: { symbol: "CHF", perUsd: 0.8162, decimals: 2 },
+  ZAR: { symbol: "R", perUsd: 16.45, decimals: 2 },
+  BRL: { symbol: "R$", perUsd: 5.468, decimals: 2 },
+  SAR: { symbol: "SAR", perUsd: 3.75, decimals: 2 },
+  NZD: { symbol: "NZ$", perUsd: 1.784, decimals: 2 },
+  KRW: { symbol: "₩", perUsd: 1348, decimals: 0 },
+  MYR: { symbol: "RM", perUsd: 4.046, decimals: 2 },
 };
-export const RATES_NOTE = "Approximate exchange rates as of 2026-11-06. Prices are converted from USD list prices; local prices differ (duties, shipping). Verify at checkout.";
+for (const code of Object.keys(CURRENCIES)) Object.defineProperty(CURRENCIES[code], "name", { enumerable: true, get: () => t(`cur.${code}`) }); // display names follow the language
+export const ratesNote = () => t("catalog.ratesNote");
 
 // Search templates, {q} = encodeURIComponent(brand + " " + name). Checked 2026-11-06: Flying Tech and Lazada fetched;
 // Amazon, RotorGeeks, Rakuten, noon, eBay and AliExpress seen live in this exact pattern; RaceDayQuads and Phaser FPV
 // (Shopify /search), Zbotic (WooCommerce ?s=) and GetFPV (Magento catalogsearch) follow their platform's standard route.
 export const REGIONS = {
-  US: { name: "United States", currency: "USD", stores: [
+  US: { currency: "USD", stores: [
     { store: "GetFPV", searchUrl: "https://www.getfpv.com/catalogsearch/result/?q={q}" },
     { store: "RaceDayQuads", searchUrl: "https://www.racedayquads.com/search?q={q}" },
     { store: "Amazon.com", searchUrl: "https://www.amazon.com/s?k={q}" }] },
-  CA: { name: "Canada", currency: "CAD", stores: [
+  CA: { currency: "CAD", stores: [
     { store: "Amazon.ca", searchUrl: "https://www.amazon.ca/s?k={q}" },
     { store: "RotorGeeks", searchUrl: "https://rotorgeeks.com/index.php?route=product/search&search={q}" }] },
-  GB: { name: "United Kingdom", currency: "GBP", stores: [
+  GB: { currency: "GBP", stores: [
     { store: "Amazon.co.uk", searchUrl: "https://www.amazon.co.uk/s?k={q}" },
     { store: "Flying Tech", searchUrl: "https://www.flyingtech.co.uk/search/{q}/" }] },
-  EU: { name: "European Union", currency: "EUR", stores: [
+  EU: { currency: "EUR", stores: [
     { store: "Amazon.de", searchUrl: "https://www.amazon.de/s?k={q}" },
     { store: "eBay.de", searchUrl: "https://www.ebay.de/sch/i.html?_nkw={q}" }] },
-  IN: { name: "India", currency: "INR", stores: [
+  IN: { currency: "INR", stores: [
     { store: "Amazon.in", searchUrl: "https://www.amazon.in/s?k={q}" },
     { store: "Zbotic", searchUrl: "https://zbotic.in/?s={q}&post_type=product" }] },
-  AU: { name: "Australia", currency: "AUD", stores: [
+  AU: { currency: "AUD", stores: [
     { store: "Amazon.com.au", searchUrl: "https://www.amazon.com.au/s?k={q}" },
     { store: "Phaser FPV", searchUrl: "https://phaserfpv.com.au/search?q={q}" }] },
-  AE: { name: "United Arab Emirates", currency: "AED", stores: [
+  AE: { currency: "AED", stores: [
     { store: "Amazon.ae", searchUrl: "https://www.amazon.ae/s?k={q}" },
     { store: "noon", searchUrl: "https://www.noon.com/uae-en/search?q={q}" }] },
-  SG: { name: "Singapore", currency: "SGD", stores: [
+  SG: { currency: "SGD", stores: [
     { store: "Amazon.sg", searchUrl: "https://www.amazon.sg/s?k={q}" },
     { store: "Lazada", searchUrl: "https://www.lazada.sg/catalog/?q={q}" }] },
-  JP: { name: "Japan", currency: "JPY", stores: [
+  JP: { currency: "JPY", stores: [
     { store: "Amazon.co.jp", searchUrl: "https://www.amazon.co.jp/s?k={q}" },
     { store: "Rakuten", searchUrl: "https://search.rakuten.co.jp/search/mall/{q}/" }] },
-  GLOBAL: { name: "International", currency: "USD", stores: [
+  GLOBAL: { currency: "USD", stores: [
     { store: "eBay", searchUrl: "https://www.ebay.com/sch/i.html?_nkw={q}" },
     { store: "AliExpress", searchUrl: "https://www.aliexpress.com/w/wholesale-{q}.html" }] },
 };
+for (const code of Object.keys(REGIONS)) Object.defineProperty(REGIONS[code], "name", { enumerable: true, get: () => t(`region.${code}`) });
 
 const has = (o, k) => typeof k === "string" && Object.hasOwn(o, k);
 export const regionForCurrency = (code) => Object.keys(REGIONS).find((r) => r !== "GLOBAL" && REGIONS[r].currency === code) ?? "GLOBAL";
@@ -80,8 +84,15 @@ export function formatMoney(usd, cur, { iso = false } = {}) {
   return iso ? `${code} ${new Intl.NumberFormat("en-US", digits).format(v)}` : new Intl.NumberFormat("en-US", { style: "currency", currency: code, ...digits }).format(v);
 }
 
+// Parts the user added on this device (ui/custom.js validates them and fills this array in place; ids start "custom-", custom: true).
+// Kept apart from CATALOG so the verified list never changes; the matcher reads allParts().
+export const CUSTOM = [];
+export const allParts = () => (CUSTOM.length ? [...CATALOG, ...CUSTOM] : CATALOG);
+
 // Local product listings first, then the region's store searches, then GLOBAL listings and searches; deduped by URL.
+// Custom parts get no links at all: a search for a made-up name would only mislead.
 export function localLinks(item, region) {
+  if (item.custom) return [];
   const reg = has(REGIONS, region) ? region : "GLOBAL", q = encodeURIComponent(`${item.brand} ${item.name}`);
   const own = (r) => (item.links || []).filter((l) => l.kind === "product" && (l.region || "GLOBAL") === r)
     .map((l) => ({ store: l.store, url: l.url, kind: "product", region: r, local: r === reg }));

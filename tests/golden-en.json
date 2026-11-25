@@ -1,0 +1,256 @@
+{
+ "metric #s=3&m=inspection&n=Inspect&cfg=hex&ha=20&age=10&b=5000&cur=INR": {
+  "warnings": [
+   "AUW above 250 g: registration is required in most countries.",
+   "Estimated core parts cost about ₹64,759.90 exceeds the budget of ₹5,000.00."
+  ],
+  "mwErr": "",
+  "note": "Approximate exchange rates as of 2026-11-06. Prices are converted from USD list prices; local prices differ (duties, shipping). Verify at checkout.",
+  "cfgWarns": [
+   "Estimated core parts cost ~$685 exceeds budget $53."
+  ],
+  "matWarns": [],
+  "parts": "sha256:99d3176f15789007:227943",
+  "bomEmpty": "<p class=\"empty\">Nothing selected yet. Press <b>Select</b> on one part per category to build the bill of materials. Without a selection, Export PDF lists every option in India.</p>",
+  "bom": "sha256:0d6c6678e5b16c6f:4442",
+  "dock": "sha256:5debab8df76a86d9:998",
+  "dockEmpty": "<p class=\"d-empty\">Pick parts to build a BOM</p>",
+  "copy": "sha256:50777662de26330b:1583",
+  "copyEmpty": "sha256:4f6f20d8989dc844:4822",
+  "csv": "sha256:cacfa83cff6bb918:939",
+  "csvEmpty": "sha256:b8c92b40ab41a819:3206",
+  "compat": "sha256:757a98d0cb678d68:718",
+  "wclass": {
+   "code": "IN-SMALL",
+   "label": "India small (2-25 kg)",
+   "lvl": "warn",
+   "note": "Register on Digital Sky for a UIN; a remote pilot certificate is needed for any non-nano commercial flying. Check your local aviation authority."
+  },
+  "checklist": "sha256:eb7144220ea19cee:869",
+  "wiring": "sha256:9688524334f053f2:2085",
+  "perf": "sha256:b4bff4239c4cf386:53514",
+  "pdfDoc": "sha256:d27db52079e16ceb:9097",
+  "pdfSha": "16eb7a94968791ee4cd0b208ffa569b64f4d10e509c735418a154844c4917539",
+  "pdfOptionsSha": "6dfaba804c5838a83aa909a2e495205f3f9a54df327e62decec7c6c3b0913c97"
+ },
+ "metric #s=3&m=fpv&fc=7&mw=900": {
+  "warnings": [
+   "AUW above 250 g: registration is required in most countries."
+  ],
+  "mwErr": "",
+  "note": "",
+  "cfgWarns": [],
+  "matWarns": [],
+  "parts": "sha256:87333024d4646c00:231537",
+  "bomEmpty": "<p class=\"empty\">Nothing selected yet. Press <b>Select</b> on one part per category to build the bill of materials. Without a selection, Export PDF lists every option in United States.</p>",
+  "bom": "sha256:6cd9b8b0a700cac5:4260",
+  "dock": "sha256:d63b6c1d66b1153b:916",
+  "dockEmpty": "<p class=\"d-empty\">Pick parts to build a BOM</p>",
+  "copy": "sha256:f2bffa591f542c80:1545",
+  "copyEmpty": "sha256:70e1f8adfce235fe:5258",
+  "csv": "sha256:6e49152365344c96:852",
+  "csvEmpty": "sha256:71b73bc030a9f8fe:3270",
+  "compat": "sha256:5a033cb9818da67e:643",
+  "wclass": {
+   "code": "US-REG",
+   "label": "US FAA registration",
+   "lvl": "warn",
+   "note": "Register with the FAA and broadcast Remote ID; commercial flying needs a Part 107 certificate. Check your local aviation authority."
+  },
+  "checklist": "sha256:c3145fabf730e930:857",
+  "wiring": "sha256:f98eea5f4b6177e7:2529",
+  "perf": "sha256:4c852f5cf3b62012:54386",
+  "pdfDoc": "sha256:63713f1777b4fe76:8938",
+  "pdfSha": "e2e4ce6ff1a6a5c2f9c48d994f91ea5c3a573b63ab03fc71ee1dca3267636b13",
+  "pdfOptionsSha": "a3c9782cf543c5411776988a94c8c83fb3d668f57990665aeb09e72e4986bf17"
+ },
+ "metric #s=3&m=mapping&cfg=fixedwing&n=Wing%20One": {
+  "warnings": [
+   "AUW above 250 g: registration is required in most countries."
+  ],
+  "mwErr": "",
+  "note": "",
+  "cfgWarns": [],
+  "matWarns": [],
+  "parts": "sha256:80ea76b475296dc4:226419",
+  "bomEmpty": "<p class=\"empty\">Nothing selected yet. Press <b>Select</b> on one part per category to build the bill of materials. Without a selection, Export PDF lists every option in United States.</p>",
+  "bom": "sha256:9b7afdbe09bbd264:4308",
+  "dock": "sha256:933387e7404e8c97:1061",
+  "dockEmpty": "<p class=\"d-empty\">Pick parts to build a BOM</p>",
+  "copy": "sha256:ebf9e7fba84ccc0d:1604",
+  "copyEmpty": "sha256:bd37b3262f741ff9:6033",
+  "csv": "sha256:6fee3c48af121e95:936",
+  "csvEmpty": "sha256:f6cae1ba404e8166:3888",
+  "compat": "sha256:0eed29984323c694:494",
+  "wclass": {
+   "code": "US-REG",
+   "label": "US FAA registration",
+   "lvl": "warn",
+   "note": "Register with the FAA and broadcast Remote ID; commercial flying needs a Part 107 certificate. Check your local aviation authority."
+  },
+  "checklist": "sha256:ca8debe95ad778c5:910",
+  "wiring": "sha256:4479952394d1752c:2522",
+  "perf": "sha256:369b013bae185839:56184",
+  "pdfDoc": "sha256:d3b20b06dd5f9b9c:9558",
+  "pdfSha": "808245a91677a9917b9fc09123585669ac8f3af44d8bbe976809cdd6e8bed872",
+  "pdfOptionsSha": "59f97a2e0e61ee4b17723f8b6fafa57c59090eeb2a5a952da87af1829b3cc7dd"
+ },
+ "metric #s=3&m=delivery&cfg=vtol&mw=3500": {
+  "warnings": [
+   "AUW above 250 g: registration is required in most countries."
+  ],
+  "mwErr": "",
+  "note": "",
+  "cfgWarns": [],
+  "matWarns": [],
+  "parts": "sha256:419792c5c1626fc7:237857",
+  "bomEmpty": "<p class=\"empty\">Nothing selected yet. Press <b>Select</b> on one part per category to build the bill of materials. Without a selection, Export PDF lists every option in United States.</p>",
+  "bom": "sha256:d49a3f46f152e9a4:5383",
+  "dock": "sha256:c2eba91f4b26cd86:1193",
+  "dockEmpty": "<p class=\"d-empty\">Pick parts to build a BOM</p>",
+  "copy": "sha256:92059eb8e1fa15a2:2089",
+  "copyEmpty": "sha256:49145ab75f57dbbd:5874",
+  "csv": "sha256:44d44db31f5bfb7c:1148",
+  "csvEmpty": "sha256:e2d35ac126c1f269:3816",
+  "compat": "sha256:4f6667f6917d2323:440",
+  "wclass": {
+   "code": "US-REG",
+   "label": "US FAA registration",
+   "lvl": "warn",
+   "note": "Register with the FAA and broadcast Remote ID; commercial flying needs a Part 107 certificate. Check your local aviation authority."
+  },
+  "checklist": "sha256:377a97abb3ea5db5:954",
+  "wiring": "sha256:03ef253dbfbcb2b1:2720",
+  "perf": "sha256:45299a80d880e2e3:55898",
+  "pdfDoc": "sha256:f230d36776ad62bf:10343",
+  "pdfSha": "1904f43658b5741210de2235acc7186f7b7fdf321fa3648d529475555548c6b5",
+  "pdfOptionsSha": "a61f2221ba91abd05732994112fab9dc3c71dfe5ef26fdb8457f961e0a8ddce1"
+ },
+ "imperial #s=3&m=inspection&n=Inspect&cfg=hex&ha=20&age=10&b=5000&cur=INR": {
+  "warnings": [
+   "AUW above 8.82 oz: registration is required in most countries.",
+   "Estimated core parts cost about ₹64,759.90 exceeds the budget of ₹5,000.00."
+  ],
+  "mwErr": "",
+  "note": "Approximate exchange rates as of 2026-11-06. Prices are converted from USD list prices; local prices differ (duties, shipping). Verify at checkout.",
+  "cfgWarns": [
+   "Estimated core parts cost ~$685 exceeds budget $53."
+  ],
+  "matWarns": [],
+  "parts": "sha256:d56bcf3394eadaf0:228671",
+  "bomEmpty": "<p class=\"empty\">Nothing selected yet. Press <b>Select</b> on one part per category to build the bill of materials. Without a selection, Export PDF lists every option in India.</p>",
+  "bom": "sha256:0d6c6678e5b16c6f:4442",
+  "dock": "sha256:5debab8df76a86d9:998",
+  "dockEmpty": "<p class=\"d-empty\">Pick parts to build a BOM</p>",
+  "copy": "sha256:50777662de26330b:1583",
+  "copyEmpty": "sha256:4f6f20d8989dc844:4822",
+  "csv": "sha256:cacfa83cff6bb918:939",
+  "csvEmpty": "sha256:b8c92b40ab41a819:3206",
+  "compat": "sha256:839fe1e383757bde:721",
+  "wclass": {
+   "code": "IN-SMALL",
+   "label": "India small (4.41-55.1 lb)",
+   "lvl": "warn",
+   "note": "Register on Digital Sky for a UIN; a remote pilot certificate is needed for any non-nano commercial flying. Check your local aviation authority."
+  },
+  "checklist": "sha256:eb7144220ea19cee:869",
+  "wiring": "sha256:22f13b4e0b1a7e3b:2085",
+  "perf": "sha256:4cbce0d50bd7f3ee:54657",
+  "pdfDoc": "sha256:247dde9156906325:9166",
+  "pdfSha": "d1a61f2795d12d7d8f87020dc43f545c19f99b50a10d22739cf163ba1465eb0a",
+  "pdfOptionsSha": "896505f53866e4270f92f5a76407f6d671c2b83cb59701bd2af79b902c5bff3e"
+ },
+ "imperial #s=3&m=fpv&fc=7&mw=900": {
+  "warnings": [
+   "AUW above 8.82 oz: registration is required in most countries."
+  ],
+  "mwErr": "",
+  "note": "",
+  "cfgWarns": [],
+  "matWarns": [],
+  "parts": "sha256:a766c220b04cd746:232285",
+  "bomEmpty": "<p class=\"empty\">Nothing selected yet. Press <b>Select</b> on one part per category to build the bill of materials. Without a selection, Export PDF lists every option in United States.</p>",
+  "bom": "sha256:6cd9b8b0a700cac5:4260",
+  "dock": "sha256:d63b6c1d66b1153b:916",
+  "dockEmpty": "<p class=\"d-empty\">Pick parts to build a BOM</p>",
+  "copy": "sha256:f2bffa591f542c80:1545",
+  "copyEmpty": "sha256:70e1f8adfce235fe:5258",
+  "csv": "sha256:6e49152365344c96:852",
+  "csvEmpty": "sha256:71b73bc030a9f8fe:3270",
+  "compat": "sha256:d1cf18b8701f75fc:646",
+  "wclass": {
+   "code": "US-REG",
+   "label": "US FAA registration",
+   "lvl": "warn",
+   "note": "Register with the FAA and broadcast Remote ID; commercial flying needs a Part 107 certificate. Check your local aviation authority."
+  },
+  "checklist": "sha256:c3145fabf730e930:857",
+  "wiring": "sha256:d7fa2e3795784334:2531",
+  "perf": "sha256:270f71de758e354b:51905",
+  "pdfDoc": "sha256:45b78d654f69f3ff:8995",
+  "pdfSha": "9822d53eaa878bb3b118d668dd7e6b0c28b285b3477e6d57daecad7917aa8fac",
+  "pdfOptionsSha": "c28f00957a56d7402a21f9922745593fbec98b4570a7da38f0f61752c556e36a"
+ },
+ "imperial #s=3&m=mapping&cfg=fixedwing&n=Wing%20One": {
+  "warnings": [
+   "AUW above 8.82 oz: registration is required in most countries."
+  ],
+  "mwErr": "",
+  "note": "",
+  "cfgWarns": [],
+  "matWarns": [],
+  "parts": "sha256:1177fdbd5f6da1e3:227117",
+  "bomEmpty": "<p class=\"empty\">Nothing selected yet. Press <b>Select</b> on one part per category to build the bill of materials. Without a selection, Export PDF lists every option in United States.</p>",
+  "bom": "sha256:9b7afdbe09bbd264:4308",
+  "dock": "sha256:933387e7404e8c97:1061",
+  "dockEmpty": "<p class=\"d-empty\">Pick parts to build a BOM</p>",
+  "copy": "sha256:ebf9e7fba84ccc0d:1604",
+  "copyEmpty": "sha256:bd37b3262f741ff9:6033",
+  "csv": "sha256:6fee3c48af121e95:936",
+  "csvEmpty": "sha256:f6cae1ba404e8166:3888",
+  "compat": "sha256:0eed29984323c694:494",
+  "wclass": {
+   "code": "US-REG",
+   "label": "US FAA registration",
+   "lvl": "warn",
+   "note": "Register with the FAA and broadcast Remote ID; commercial flying needs a Part 107 certificate. Check your local aviation authority."
+  },
+  "checklist": "sha256:ca8debe95ad778c5:910",
+  "wiring": "sha256:9b2e24591e1a0195:2526",
+  "perf": "sha256:b15c4442133aa31b:55623",
+  "pdfDoc": "sha256:e7d6a2e71048a84f:9630",
+  "pdfSha": "b6c9e40f20d230cd479df34c0d79298ce4c7ec5e15d482981078267677089b04",
+  "pdfOptionsSha": "2740daba5352e80983dfc0e8ecc43f660fee5bbc9eb42655505478a33375545b"
+ },
+ "imperial #s=3&m=delivery&cfg=vtol&mw=3500": {
+  "warnings": [
+   "AUW above 8.82 oz: registration is required in most countries."
+  ],
+  "mwErr": "",
+  "note": "",
+  "cfgWarns": [],
+  "matWarns": [],
+  "parts": "sha256:db4470e8fc761738:238708",
+  "bomEmpty": "<p class=\"empty\">Nothing selected yet. Press <b>Select</b> on one part per category to build the bill of materials. Without a selection, Export PDF lists every option in United States.</p>",
+  "bom": "sha256:d49a3f46f152e9a4:5383",
+  "dock": "sha256:c2eba91f4b26cd86:1193",
+  "dockEmpty": "<p class=\"d-empty\">Pick parts to build a BOM</p>",
+  "copy": "sha256:92059eb8e1fa15a2:2089",
+  "copyEmpty": "sha256:49145ab75f57dbbd:5874",
+  "csv": "sha256:44d44db31f5bfb7c:1148",
+  "csvEmpty": "sha256:e2d35ac126c1f269:3816",
+  "compat": "sha256:8efec5e162cd43c3:441",
+  "wclass": {
+   "code": "US-REG",
+   "label": "US FAA registration",
+   "lvl": "warn",
+   "note": "Register with the FAA and broadcast Remote ID; commercial flying needs a Part 107 certificate. Check your local aviation authority."
+  },
+  "checklist": "sha256:377a97abb3ea5db5:954",
+  "wiring": "sha256:10378f674e377ae0:2724",
+  "perf": "sha256:0b8e6d9d79856829:55978",
+  "pdfDoc": "sha256:0ad17fb772d9ee7c:10409",
+  "pdfSha": "c836713b85d315a3a7714a53c61c29918d7f19b31a2b85ee3e95cf5d34a10bf5",
+  "pdfOptionsSha": "8ac3558490392d6ed1401f0cae3c50a728155616ef81e6450e781fe903dc830d"
+ }
+}

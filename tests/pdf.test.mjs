@@ -202,7 +202,8 @@ checkPdf(buildBomPdf({ title: "₹" }), 0, "minimal-sample.pdf");
 const t0 = performance.now();
 const long = checkPdf(buildBomPdf({ title: "x".repeat(20000), subtitle: "y".repeat(20000), notes: ["z".repeat(20000)] }), 0, "long-word-sample.pdf");
 const ms = performance.now() - t0;
-assert.ok(ms < 200, `20000-char word wraps in under 200 ms (took ${ms.toFixed(0)} ms)`);
+// 1000 ms ceiling: ~5x headroom over a loaded run (214 ms seen), still far below the cubic blow-up (15 s at 8000 chars)
+assert.ok(ms < 1000, `20000-char word wraps in under 1000 ms (took ${ms.toFixed(0)} ms)`);
 assert.ok(long.pages >= 1 && long.s.includes("zzzz"), "long word is split across lines, not dropped");
 
 console.log(`pdf tests passed: bom ${bom.pages} pages / ${bomLinks} links, options ${opt.pages} pages / ${optLinks} links, edge ${edge.pages} page`);

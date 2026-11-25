@@ -2,6 +2,9 @@
 // Pure: nothing touches the DOM at import; only downloadPdf() needs a browser.
 // Text uses the standard-14 Helvetica / Helvetica-Bold with /WinAnsiEncoding, so no font is embedded.
 // The whole file is built as a string of char codes 0-255 (one char = one byte), so xref offsets are string indexes.
+// The fixed labels (column titles, TOTAL, Page x of y) come from the i18n catalog in the PDF's language: i18n.pdfLang() is English for a script
+// WinAnsi cannot draw (Hindi), so that PDF is entirely English; every other language is drawn with its WinAnsi (Latin-1) letters.
+import { t as tr, withLang, pdfLang } from "../i18n/i18n.js";
 
 const PW = 595.28, PH = 841.89, M = 36, CW = PW - 2 * M; // A4 portrait in pt, 0.5 in margins
 const BAND = 58, TOP = BAND + 22, BOTTOM = PH - 36; // header band; body runs TOP..BOTTOM, y measured downwards
@@ -125,13 +128,13 @@ const blank = (s) => /^[\s\-\x96\x97]*$/.test(s);
 const NUM = /^([A-Z]{3} )?[-+~<>=]*\d/; // "12.5 W", "~3", "INR 1,234.00" read as numbers -> right-aligned
 
 // fit = natural width (numbers, short codes); the other columns share the rest by weight wt.
-const BOM_COLS = [{ t: "#", right: 1, fit: 1 }, { t: "Category", fit: 1 }, { t: "Part", wt: 2.4 }, { t: "Brand", wt: 0.95 },
-  { t: "Qty", right: 1, fit: 1 }, { t: "Unit", right: 1, fit: 1 }, { t: "Line", right: 1, fit: 1 }, { t: "Links", wt: 1.3 }];
-const OPT_COLS = [{ t: "#", right: 1, fit: 1 }, { t: "Part", wt: 3 }, { t: "Brand", wt: 1.2 },
-  { t: "Price", right: 1, fit: 1 }, { t: "Links", wt: 1.3 }];
+const BOM_COLS = () => [{ t: "#", right: 1, fit: 1 }, { t: tr("pdfx.col.category"), fit: 1 }, { t: tr("pdfx.col.part"), wt: 2.4 }, { t: tr("pdfx.col.brand"), wt: 0.95 },
+  { t: tr("pdfx.col.qty"), right: 1, fit: 1 }, { t: tr("pdfx.col.unit"), right: 1, fit: 1 }, { t: tr("pdfx.col.line"), right: 1, fit: 1 }, { t: tr("pdfx.col.links"), wt: 1.3 }];
+const OPT_COLS = () => [{ t: "#", right: 1, fit: 1 }, { t: tr("pdfx.col.part"), wt: 3 }, { t: tr("pdfx.col.brand"), wt: 1.2 },
+  { t: tr("pdfx.col.price"), right: 1, fit: 1 }, { t: tr("pdfx.col.links"), wt: 1.3 }];
 
 /** doc -> PDF bytes. doc shape: SPEC-v2 section 3. All values are display strings. */
-export function buildBomPdf(doc) {
+function build(doc) {
   doc = doc || {};
   const pages = [];
   let pg, y, sec = 0;
@@ -205,7 +208,7 @@ export function buildBomPdf(doc) {
     t.body.forEach((row, r) => {
       if (r && y + row.h > BOTTOM) { // r > 0: the caller's room() already placed the first row
         rule(M, y, M + t.W, y, 1.2, INK);
-        text(M + t.W, y + 10, `Continued on page ${pages.length + 1}`, "F1", 6.4, INK2, { right: true });
+        text(M + t.W, y + 10, S(tr("pdfx.continued", { page: pages.length + 1 })), "F1", 6.4, INK2, { right: true });
         newPage();
         drawHead(t); // header row repeats on every page
       }
@@ -266,7 +269,7 @@ export function buildBomPdf(doc) {
       });
       rows.push({ row, h: Math.max(1, ...row.map((c) => Math.max(c.k.length, c.v.length))) * 10.5 + 6 });
     }
-    section("Key figures", "", rows[0].h);
+    section(tr("pdfx.keyFigures"), "", rows[0].h);
     for (const { row, h } of rows) {
       room(h);
       row.forEach((c, i) => {
@@ -291,8 +294,8 @@ export function buildBomPdf(doc) {
       [cell(S(r.line), "F2")],
       (r.links || []).map(linkCell),
     ]);
-    const t = prep(widths(BOM_COLS, rows), rows);
-    section("Bill of materials", `${list.length} line${list.length === 1 ? "" : "s"}`, t.need);
+    const t = prep(widths(BOM_COLS(), rows), rows);
+    section(tr("pdfx.bom"), tr("pdfx.lines", { count: list.length }), t.need);
     drawTable(t);
 
     // Total box: the site's dark readout (ink panel, amber figure).
@@ -302,12 +305,12 @@ export function buildBomPdf(doc) {
     room(h + 10);
     y += 10;
     rect(bx, y, bw, h, INK);
-    text(bx + 10, y + 19, "TOTAL", "F2", 7.4, PAPER, { tc: 1.4 });
+    text(bx + 10, y + 19, U(tr("pdfx.total")), "F2", 7.4, PAPER, { tc: 1.4 });
     text(bx + bw - 10, y + 21, tot, "F2", Math.min(14, (14 * (bw - 74)) / (tw(tot, "F2", 14) || 1)), AMBER, { right: true });
     let yy = y + 32;
     if (bud) {
       rule(bx + 10, yy, bx + bw - 10, yy, 0.5, INK2);
-      text(bx + 10, yy + 10, "BUDGET", "F2", 6.4, PANEL_INK, { tc: 1.2 });
+      text(bx + 10, yy + 10, U(tr("pdfx.budget")), "F2", 6.4, PANEL_INK, { tc: 1.2 });
       text(bx + bw - 10, yy + 10, bud, "F1", 8, PANEL_INK, { right: true });
       yy += 15;
     }
@@ -321,12 +324,12 @@ export function buildBomPdf(doc) {
       rows: (g.items || []).filter(Boolean).map((it, i) => [[cell(String(i + 1), "F1", 7.4, INK2)], [cell(S(it.part))],
         [cell(S(it.brand))], [cell(S(it.price), "F2")], (it.links || []).map(linkCell)]),
     }));
-    const cols = widths(OPT_COLS, groups.flatMap((g) => g.rows)); // one set of widths so columns line up across categories
-    const ts = groups.map((g) => prep(cols, g.rows.length ? g.rows : [[[], [cell("No parts listed.", "F1", 7.4, INK2)], [], [], []]]));
+    const cols = widths(OPT_COLS(), groups.flatMap((g) => g.rows)); // one set of widths so columns line up across categories
+    const ts = groups.map((g) => prep(cols, g.rows.length ? g.rows : [[[], [cell(S(tr("pdfx.noParts")), "F1", 7.4, INK2)], [], [], []]]));
     const n = groups.reduce((a, g) => a + g.rows.length, 0);
-    section("Available options", `${n} parts in ${groups.length} categor${groups.length === 1 ? "y" : "ies"}`, 22 + (ts[0]?.need || 0));
+    section(tr("pdfx.options"), tr("pdfx.optionsAside", { parts: tr("pdfx.parts", { count: n }), cats: tr("pdfx.cats", { count: groups.length }) }), 22 + (ts[0]?.need || 0));
     groups.forEach((g, k) => {
-      subhead(`${sec}.${k + 1}`, g.name, `${g.rows.length} option${g.rows.length === 1 ? "" : "s"}`, ts[k].need);
+      subhead(`${sec}.${k + 1}`, g.name, tr("pdfx.optionCount", { count: g.rows.length }), ts[k].need);
       drawTable(ts[k]);
     });
   }
@@ -344,7 +347,7 @@ export function buildBomPdf(doc) {
 
   const notes = (doc.notes || []).map(S).filter((s) => s.trim()).map((s) => wrap(s, "F1", 7.6, CW - 20));
   if (notes.length) {
-    section("Notes", "", notes[0].length * 10.4 + 4);
+    section(tr("pdfx.notes"), "", notes[0].length * 10.4 + 4);
     notes.forEach((ls, i) => {
       room(ls.length * 10.4 + 4);
       text(M, y + 8, String(i + 1).padStart(2, "0"), "F2", 7.6, RUST);
@@ -372,7 +375,7 @@ export function buildBomPdf(doc) {
     text(tx, cy + 2, title, "F2", Math.min(15, (15 * maxW) / (tw(title, "F2", 15, 0.8, 88) || 1)), INK, { tc: 0.8, sc: 88 });
     text(tx, cy + 13.5, clip(U(doc.subtitle), "F1", 6.8, maxW, 0.8), "F1", 6.8, INK2, { tc: 0.8 });
     text(PW - M, cy + 2, S(doc.dateISO), "F2", 8.5, INK, { right: true, tc: 0.5 });
-    text(PW - M, cy + 13.5, `Page ${i + 1} of ${pages.length}`, "F1", 7, INK2, { right: true, tc: 0.4 });
+    text(PW - M, cy + 13.5, S(tr("pdfx.page", { n: i + 1, total: pages.length })), "F1", 7, INK2, { right: true, tc: 0.4 });
     p.ops.push(...body);
   });
 
@@ -410,6 +413,9 @@ export function buildBomPdf(doc) {
   }
   return bytes;
 }
+
+/** doc -> PDF bytes, with the fixed labels in the PDF's language (English where that language's script cannot be drawn: see the top of this file). */
+export const buildBomPdf = (doc) => withLang(pdfLang(), () => build(doc));
 
 /** Browser only: save bytes as a PDF download. */
 export function downloadPdf(bytes, filename = "document.pdf") {

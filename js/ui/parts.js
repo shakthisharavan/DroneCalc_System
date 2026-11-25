@@ -1,25 +1,23 @@
 // Parts list, option expanders, BOM table and BOM dock. Pure string builders; every text value is escaped.
+import * as U from './units.js';
+import { t, tf } from '../i18n/i18n.js';
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // Display order (SPEC-v3 4): frame, airframe (vtol / fixedwing / tilt), motor, pusher, esc, fc, battery, prop, servo, camera, extras, then any other category.
 export const ORDER = ['frame', 'vtol', 'fixedwing', 'tilt', 'motor', 'pusher', 'esc', 'fc', 'battery', 'prop', 'servo', 'camera', 'extras'];
-const LABEL = { frame: 'Frame', vtol: 'VTOL airframe', fixedwing: 'Fixed-wing airframe', tilt: 'Tilt mechanism and servos', motor: 'Motors', pusher: 'Pusher motor', esc: 'ESC', fc: 'Flight controller', battery: 'Battery', prop: 'Propellers', servo: 'Servos', camera: 'Camera', extras: 'Extras', vtx: 'Video transmitter', gps: 'GPS', radio: 'Radio link', payload: 'Payload gear', sensor: 'Sensors' };
+const LABEL = new Set(['frame', 'vtol', 'fixedwing', 'tilt', 'motor', 'pusher', 'esc', 'fc', 'battery', 'prop', 'servo', 'camera', 'extras', 'vtx', 'gps', 'radio', 'payload', 'sensor']); // text: cat.<id>
 // Category colour, one tone per family (main.css tokens): airframe slate, propulsion blue, electronics teal, power mustard, payload rust, extras ink.
 export const TONE = { frame: "slate", vtol: "slate", fixedwing: "slate", tilt: "slate", servo: "slate", motor: "blue", pusher: "blue", prop: "blue", esc: "teal", fc: "teal", battery: "mustard", camera: "accent", vtx: "accent", gps: "accent", radio: "accent", sensor: "accent", payload: "accent" };
 const tone = (k) => (Object.hasOwn(TONE, k) ? TONE[k] : "ink");
 // Headings that depend on the airframe kind: 'multi' | 'vtol' | 'tiltrotor' | 'fixedwing' (true still means vtol).
-const BY_KIND = {
-  vtol: { motor: 'Lift motors', servo: 'Control-surface servos' },
-  tiltrotor: { vtol: 'Tiltrotor airframe', motor: 'Tilting motors (hover and cruise)', servo: 'Control-surface servos' },
-  fixedwing: { motor: 'Motor', pusher: 'Main motor', prop: 'Propeller', servo: 'Control-surface servos' },
-};
-export const catLabel = (k, kind) => { const by = BY_KIND[kind === true ? 'vtol' : kind]; return (by && Object.hasOwn(by, k) && by[k]) || (Object.hasOwn(LABEL, k) && LABEL[k]) || k.charAt(0).toUpperCase() + k.slice(1); };
+const BY_KIND = { vtol: ['motor', 'servo'], tiltrotor: ['vtol', 'motor', 'servo'], fixedwing: ['motor', 'pusher', 'prop', 'servo'] }; // text: cat.kind.<kind>.<id>
+export const catLabel = (k, kind) => { const kd = kind === true ? 'vtol' : kind; return (Object.hasOwn(BY_KIND, kd) && BY_KIND[kd].includes(k) && t(`cat.kind.${kd}.${k}`)) || (LABEL.has(k) && t(`cat.${k}`)) || k.charAt(0).toUpperCase() + k.slice(1); };
 // Pack-sold parts (item.packOf > 1): qty counts packs, item.units the pieces needed. null for single parts.
-const NOUN = { prop: 'props', motor: 'motors', servo: 'servos', tilt: 'servos', esc: 'ESCs', battery: 'packs' };
+const NOUN = new Set(['prop', 'motor', 'servo', 'tilt', 'esc', 'battery']); // text: parts.noun.<id>
 export function pack(it, q, key) {
   if (!(it?.packOf > 1)) return null;
-  const n = q * it.packOf, need = Number.isFinite(it.units) && it.units !== n ? `, ${it.units} needed` : '';
-  return { sets: `set of ${it.packOf}`, pcs: `${n} ${NOUN[key] || 'pieces'}${need}` };
+  const n = q * it.packOf, noun = t(`parts.noun.${NOUN.has(key) ? key : 'pieces'}`);
+  return { sets: t('parts.pack.set', { n: it.packOf }), pcs: Number.isFinite(it.units) && it.units !== n ? t('parts.pack.pcsNeed', { n, noun, units: it.units }) : t('parts.pack.pcs', { n, noun }) };
 }
 
 function need(key, rq) {
@@ -27,20 +25,20 @@ function need(key, rq) {
   if (!q) return '';
   const r = Math.round;
   const m = {
-    frame: () => `${q.minSizeMm}-${q.maxSizeMm} mm, ${q.material}, ${q.configuration}`,
-    vtol: () => `${r(q.minSpanMm)}-${r(q.maxSpanMm)} mm span, ≥ ${q.minAreaDm2} dm² wing, AUW ≤ ${q.maxAuwKg} kg`,
-    fixedwing: () => `${r(q.minSpanMm)}-${r(q.maxSpanMm)} mm span, ≥ ${q.minAreaDm2} dm² wing, AUW ≤ ${q.maxAuwKg} kg`,
-    tilt: () => `${q.servoCount} tilt servos${Number.isFinite(q.minTorqueKgcm) ? `, ≥ ${q.minTorqueKgcm} kg·cm torque` : ''}`,
-    motor: () => `${q.statorMm} stator class, ${q.kvMin}-${q.kvMax} KV, ≥ ${r(q.minThrustG)} g thrust each, x${q.count}`,
-    pusher: () => `${q.statorMm} stator class, ${q.kvMin}-${q.kvMax} KV, ≥ ${r(q.minThrustG)} g thrust, ${q.propInch} in prop`,
-    esc: () => `≥ ${r(q.minContinuousA)} A, ${q.minCells}-${q.maxCells}S, ${q.protocol}`,
-    battery: () => `${q.cells}S, ${r(q.minMah)}-${r(q.maxMah)} mAh, ≥ ${q.minC}C, ${q.chemistry}`,
-    prop: () => `${q.inch} inch`,
-    fc: () => `≥ ${q.minMotorOutputs} motor outputs${q.needsGps ? ', GPS' : ''}`,
-    servo: () => `${q.count ?? q.servoCount} servos`,
-    camera: () => `${q.kind || 'any'} camera, ≤ ${r(q.maxWeightG)} g`,
+    frame: () => t('parts.need.frame', { min: q.minSizeMm, max: q.maxSizeMm, material: q.material, configuration: q.configuration }),
+    vtol: () => t('parts.need.wing', { min: r(q.minSpanMm), max: r(q.maxSpanMm), area: q.minAreaDm2, auw: q.maxAuwKg }),
+    fixedwing: () => t('parts.need.wing', { min: r(q.minSpanMm), max: r(q.maxSpanMm), area: q.minAreaDm2, auw: q.maxAuwKg }),
+    tilt: () => t(Number.isFinite(q.minTorqueKgcm) ? 'parts.need.tiltTorque' : 'parts.need.tilt', { n: q.servoCount, torque: q.minTorqueKgcm }),
+    motor: () => t('parts.need.motor', { stator: q.statorMm, kvMin: q.kvMin, kvMax: q.kvMax, thrust: r(q.minThrustG), count: q.count }),
+    pusher: () => t('parts.need.pusher', { stator: q.statorMm, kvMin: q.kvMin, kvMax: q.kvMax, thrust: r(q.minThrustG), inch: q.propInch }),
+    esc: () => t('parts.need.esc', { a: r(q.minContinuousA), minCells: q.minCells, maxCells: q.maxCells, protocol: q.protocol }),
+    battery: () => t('parts.need.battery', { cells: q.cells, minMah: r(q.minMah), maxMah: r(q.maxMah), c: q.minC, chemistry: q.chemistry }),
+    prop: () => t('parts.need.prop', { inch: q.inch }),
+    fc: () => t(q.needsGps ? 'parts.need.fcGps' : 'parts.need.fc', { n: q.minMotorOutputs }),
+    servo: () => t('parts.need.servo', { n: q.count ?? q.servoCount }),
+    camera: () => t('parts.need.camera', { kind: q.kind || t('parts.need.anyKind'), g: r(q.maxWeightG) }),
   }[key];
-  return m ? m() : '';
+  return m ? U.text(m()) : '';
 }
 
 // Matcher may flag a category as unfilled via rec.incomplete / rec.missing (array of cats or {cat: reason}) and rec.closest[cat].
@@ -67,7 +65,9 @@ export function sections(rec, opts) {
   return { main, other, off, all: [...new Set([...main, ...extra, ...other])] };
 }
 
-export const listed = (it) => it.localListing ?? (it.links || []).some((l) => l.local && l.kind === 'product');
+// A custom part (user-entered, unverified) is never "listed" anywhere, whatever the matcher says about locality.
+export const listed = (it) => !it.custom && (it.localListing ?? (it.links || []).some((l) => l.local && l.kind === 'product'));
+export const customTxt = () => t('parts.custom');
 
 // One link per store, no near-identical URLs. localLinks already orders: local product, local search, global.
 export function links(list, max = 3) {
@@ -78,24 +78,19 @@ export function links(list, max = 3) {
     seenU.add(u); seenS.add(st); return true;
   }).slice(0, max);
 }
-export const linkLabel = (l) => (l.kind === 'search' ? 'Search ' : '') + l.store;
-const linkBtns = (list, max) => `<span class="lk">${links(list, max).map((l) => `<a class="btn sm buy" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(linkLabel(l))}<span class="sr"> (opens in new tab)</span></a>`).join('')}</span>`;
-const linkTxt = (list, max) => `<span class="lk lt"><span class="lt-h">Buy:</span>${links(list, max).map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(linkLabel(l))}<span class="sr"> (opens in new tab)</span></a>`).join('')}</span>`;
-const badge = (it, c) => (listed(it) ? `<span class="badge on">Listed ${esc(c.where)}</span>` : `<span class="badge">Search ${esc(c.where)}</span>`);
-const selBtn = (key, it, on) => `<button type="button" class="sel" data-cat="${esc(key)}" data-id="${esc(it.id)}" aria-pressed="${on}" aria-label="Select ${esc(it.brand)} ${esc(it.name)}"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13"/><path d="M4.5 8.2l2.4 2.4 4.6-5.2"/></svg>Select</button>`;
+export const linkLabel = (l) => (l.kind === 'search' ? t('parts.link.search', { store: l.store }) : l.store);
+const linkBtns = (list, max) => `<span class="lk">${links(list, max).map((l) => `<a class="btn sm buy" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(linkLabel(l))}<span class="sr"> ${esc(t('parts.newTab'))}</span></a>`).join('')}</span>`;
+const linkTxt = (list, max) => !links(list, max).length ? '' : `<span class="lk lt"><span class="lt-h">${esc(t('parts.buy'))}</span>${links(list, max).map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(linkLabel(l))}<span class="sr"> ${esc(t('parts.newTab'))}</span></a>`).join('')}</span>`;
+const badge = (it, c) => (it.custom ? `<span class="badge cust">${esc(customTxt())}</span>` : listed(it) ? `<span class="badge on">${esc(t('parts.listed', { where: c.where }))}</span>` : `<span class="badge">${esc(t('parts.search', { where: c.where }))}</span>`);
+const selBtn = (key, it, on) => `<button type="button" class="sel" data-cat="${esc(key)}" data-id="${esc(it.id)}" aria-pressed="${on}" aria-label="${esc(t('parts.select.aria', { brand: it.brand, name: it.name }))}"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13"/><path d="M4.5 8.2l2.4 2.4 4.6-5.2"/></svg>${esc(t('parts.select.label'))}</button>`;
 export const CHEV = '<svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 2.5 8 6l-3.5 3.5"/></svg>';
 
 // Plain-language explainers (SPEC-v4 9): [term for the "What is ..?" label, 1-2 sentences].
-export const GLOSSARY = {
-  kv: ['KV', 'KV is how many RPM a motor turns per volt with no load. Low KV spins big props slowly and efficiently; high KV spins small props fast.'],
-  cells: ['S (cells)', 'S is the number of battery cells in series: 1S is about 3.7 V, so a 6S pack is about 22 V. Every part on the power side must be rated for it.'],
-  c: ['C rating', 'C rating says how fast a pack can be drained: 50C on a 2 Ah pack claims 100 A. Labels are optimistic, so keep peak current under about 70% of it.'],
-  twr: ['thrust : weight', 'Thrust to weight is full-throttle thrust divided by takeoff weight. 2:1 hovers and handles wind; racing quads run 7:1 or more.'],
-  hover: ['hover thrust', 'Hover thrust is the share of full thrust needed just to hold height (100 ÷ thrust : weight). Builders aim for 45-50%; the throttle reads higher because thrust grows with about the square of throttle.'],
-  wh: ['mAh vs Wh', 'mAh is charge at the pack voltage; Wh is the energy (mAh x volts / 1000). Compare packs of different cell counts by Wh, not mAh.'],
-  stator: ['stator size', 'Stator size is the motor core width and height in mm: 2306 is 23 mm wide, 6 mm tall. A bigger stator gives more torque for bigger props.'],
-};
-export const gl = (k) => (GLOSSARY[k] ? `<details class="gl"><summary aria-label="What is ${esc(GLOSSARY[k][0])}?">?</summary><p>${esc(GLOSSARY[k][1])}</p></details>` : '');
+// text: glossary.<id>.term and glossary.<id>.text; read through getters so the active language shows.
+export const GLOSSARY = Object.defineProperties({}, Object.fromEntries(['kv', 'cells', 'c', 'twr', 'hover', 'wh', 'stator'].map((k) => [k, { enumerable: true, get: () => [t(`glossary.${k}.term`), t(`glossary.${k}.text`)] }])));
+// Stator codes are millimetres by convention in every unit system: the imperial text says so and gives the example in inches.
+const GL_IMP = new Set(['stator']); // text: glossary.<id>.textImperial
+export const gl = (k) => (Object.hasOwn(GLOSSARY, k) ? `<details class="gl"><summary aria-label="${esc(t('glossary.aria', { term: GLOSSARY[k][0] }))}">?</summary><p>${esc((U.isImperial() && GL_IMP.has(k) && t(`glossary.${k}.textImperial`)) || GLOSSARY[k][1])}</p></details>` : '');
 
 // Swap effect against the category's best pick (SPEC-v4 8): weight x pieces and price x qty. dir: up = heavier and/or dearer, down = lighter
 // and/or cheaper, same = no change or a mixed trade. c = { qty(key, it), money(usd) }.
@@ -108,103 +103,102 @@ export function delta(it, best, key, c) {
   const dp = (it.qty ?? c.qty(key, it)) * it.priceUsd - (best.qty ?? c.qty(key, best)) * best.priceUsd + (sideE ? sideE * (esc0.qty ?? c.qty('esc', esc0)) * esc0.priceUsd : 0);
   const sg = Math.sign(dg), sp = Math.abs(dp) < 0.005 ? 0 : Math.sign(dp), sign = (s) => (s < 0 ? '−' : '+');
   const dir = sg >= 0 && sp >= 0 && sg + sp > 0 ? 'up' : sg <= 0 && sp <= 0 && sg + sp < 0 ? 'down' : 'same';
-  return { dir, text: `${sign(sg)}${Math.abs(dg)} g · ${sign(sp)}${c.money(Math.abs(dp))}${sideE ? ' incl. ESC' : ''}` };
+  return { dir, text: `${sign(sg)}${U.show('g', Math.abs(dg))} · ${sign(sp)}${c.money(Math.abs(dp))}${sideE ? ' ' + t('parts.delta.inclEsc') : ''}` };
 }
 // Spec lines that use jargon get their explainers (a div, since <details> cannot sit inside a <p>).
-const NEED_GL = { motor: gl('kv') + gl('stator'), pusher: gl('kv') + gl('stator'), battery: gl('cells') + gl('c') + gl('wh') };
-const deltaHtml = (d) => (d ? ` <span class="delta" data-dir="${d.dir}" title="Against the best pick">${esc(d.text)}</span>` : '');
+const needGl = (k) => ({ motor: gl('kv') + gl('stator'), pusher: gl('kv') + gl('stator'), battery: gl('cells') + gl('c') + gl('wh') })[k] || '';
+const deltaHtml = (d) => (d ? ` <span class="delta" data-dir="${d.dir}" title="${esc(t('parts.delta.title'))}">${esc(d.text)}</span>` : '');
 
 function card(it, i, key, c, miss, extra) {
   const on = c.sel[key] === it.id, best = !miss && !extra && i === 0;
   const q = it.qty ?? c.qty(key, it), pk = pack(it, q, key);
   const rk = miss ? '~' : extra ? '+' : 'ABC'[i] || i + 1;
-  const tag = miss ? '<b class="tag">Closest, not a full match</b> ' : best ? '<b class="tag">Best pick</b> ' : '';
+  const tag = miss ? `<b class="tag">${esc(t('parts.tag.closest'))}</b> ` : best ? `<b class="tag">${esc(t('parts.tag.best'))}</b> ` : '';
   return `<li class="it${on ? ' on' : ''}${best ? ' best' : ''}">
-<span class="rk" title="${miss ? 'Closest option' : extra ? 'Extra' : best ? 'Best pick' : 'Alternate'}">${rk}</span>
-<div class="it-m"><div class="nm">${esc(it.name)}</div><div class="meta">${tag}${extra ? esc(catLabel(key, c.kind)) + ' &middot; ' : ''}${esc(it.brand)} &middot; ${esc(it.weightG)} g${miss || extra || best ? '' : deltaHtml(delta(it, c.rec?.[key]?.[0], key, c))}</div></div>
-<div class="pr"><b>${c.money(q * it.priceUsd)}</b>${pk ? `<small>${q} &times; ${esc(pk.sets)} (${esc(pk.pcs)})</small><small>${c.money(it.priceUsd)} per set</small>` : q > 1 ? `<small>${q} &times; ${c.money(it.priceUsd)}</small>` : ''}</div>
+<span class="rk" title="${esc(miss ? t('parts.rank.closest') : extra ? t('parts.rank.extra') : best ? t('parts.tag.best') : t('parts.rank.alt'))}">${rk}</span>
+<div class="it-m"><div class="nm">${esc(it.name)}</div><div class="meta">${tag}${extra ? esc(catLabel(key, c.kind)) + ' &middot; ' : ''}${esc(it.brand)} &middot; ${esc(U.show('g', it.weightG))}${miss || extra || best ? '' : deltaHtml(delta(it, c.rec?.[key]?.[0], key, c))}</div></div>
+<div class="pr"><b>${c.money(q * it.priceUsd)}</b>${pk ? `<small>${q} &times; ${esc(pk.sets)} (${esc(pk.pcs)})</small><small>${esc(t('parts.perSet', { price: c.money(it.priceUsd) }))}</small>` : q > 1 ? `<small>${q} &times; ${c.money(it.priceUsd)}</small>` : ''}</div>
 <div class="it-f">${badge(it, c)}${selBtn(key, it, on)}</div>${linkTxt(it.links, 3)}</li>`;
 }
 
 function optRow(it, key, c, ro) {
   const on = !ro && c.sel[key] === it.id;
-  return `<li class="opt${on ? ' on' : ''}"><div class="o-m"><span class="nm">${esc(it.name)}</span><span class="meta">${esc(it.brand)} &middot; ${esc(it.weightG)} g${ro ? '' : deltaHtml(delta(it, c.rec?.[key]?.[0], key, c))}</span></div><b class="pr">${c.money(it.priceUsd)}</b><div class="o-f">${badge(it, c)}${ro ? '' : selBtn(key, it, on)}</div>${linkTxt(it.links, 3)}</li>`;
+  return `<li class="opt${on ? ' on' : ''}"><div class="o-m"><span class="nm">${esc(it.name)}</span><span class="meta">${esc(it.brand)} &middot; ${esc(U.show('g', it.weightG))}${ro ? '' : deltaHtml(delta(it, c.rec?.[key]?.[0], key, c))}</span></div><b class="pr">${c.money(it.priceUsd)}</b><div class="o-f">${badge(it, c)}${ro ? '' : selBtn(key, it, on)}</div>${linkTxt(it.links, 3)}</li>`;
 }
 
 // ro = read-only list (no Select), for categories that do not belong to this build.
 function more(key, c, ro) {
   const list = c.optsFor(key);
   // A category in the build lists swaps for its pick: "Similar parts"; the rest stay a plain option list.
-  const head = !ro && c.sec?.main?.includes(key) ? `Similar parts (${list.length}) ${esc(c.where)}` : `All ${list.length} option${list.length === 1 ? '' : 's'} ${esc(c.where)}`;
+  const head = esc(!ro && c.sec?.main?.includes(key) ? t('parts.more.similar', { count: list.length, where: c.where }) : t('parts.more.all', { count: list.length, where: c.where }));
   return list.length ? `<details class="more"><summary>${CHEV}${head}</summary><ul class="opts">${list.map((it) => optRow(it, key, c, ro)).join('')}</ul></details>` : '';
 }
 
 export function section(key, c) {
   const g = gaps(c.rec, key), list = g.miss ? g.items : c.rec[key] || [], n = need(key, c.req);
-  const gap = g.miss ? `<p class="nopart"><b>No off-the-shelf part found</b>${g.reason ? ': ' + esc(g.reason) : ' that meets this spec.'}${list.length ? ' Closest options below, check fit before buying.' : ''}</p>` : '';
-  const fb = (c.rec.regionFallback || []).includes(key) ? `<p class="fb">No local listing ${esc(c.where)}. Showing parts that ship internationally.</p>` : '';
+  const gap = g.miss ? `<p class="nopart">${g.reason ? tf('parts.gap.reason', { reason: U.text(g.reason) }) : tf('parts.gap.none')}${list.length ? ' ' + esc(t('parts.gap.closest')) : ''}</p>` : '';
+  const fb = (c.rec.regionFallback || []).includes(key) ? `<p class="fb">${esc(t('parts.noLocal', { where: c.where }))}</p>` : '';
   // ESC: follows the picked (else best) motor; options stay selectable for a motor swap.
-  const free = key === 'esc' && c.escFree ? `<p class="fb">Not needed: built into ${esc(c.motor.brand)} ${esc(c.motor.name)}. Pick one only if you change to a motor without one.</p>` : '';
-  return `<section class="cat${g.miss ? ' gap' : ''}" id="cat-${esc(key)}" tabindex="-1"><h4 data-tone="${tone(key)}">${esc(catLabel(key, c.kind))}</h4>${n ? `<div class="need">Spec: ${esc(n)}${NEED_GL[key] || ''}</div>` : ''}${free}${gap}${fb}${list.length ? `<ul class="items">${list.map((it, i) => card(it, i, key, c, g.miss)).join('')}</ul>` : ''}${more(key, c)}</section>`;
+  const free = key === 'esc' && c.escFree ? `<p class="fb">${esc(t('parts.escFree', { brand: c.motor.brand, name: c.motor.name }))}</p>` : '';
+  return `<section class="cat${g.miss ? ' gap' : ''}" id="cat-${esc(key)}" tabindex="-1"><h4 data-tone="${tone(key)}">${esc(catLabel(key, c.kind))}</h4>${n ? `<div class="need">${esc(t('parts.spec', { need: n }))}${needGl(key)}</div>` : ''}${free}${gap}${fb}${list.length ? `<ul class="items">${list.map((it, i) => card(it, i, key, c, g.miss)).join('')}</ul>` : ''}${more(key, c)}</section>`;
 }
 
 // c = { rec, req, opts, sec, sel, money, where, kind, qty(key,item), optsFor(key), note }
 export function partsHtml(c) {
-  // The matcher's "ESC built into ..." note follows its best motor; the ESC section says it for the picked motor instead.
-  const { rec, sec } = c, t = rec?.totalUsd, ex = rec?.extras || [], notes = [...new Set(rec?.notes || [])].filter((x) => !/^ESC built into /.test(x));
+  const { rec, sec } = c, tot = rec?.totalUsd, ex = rec?.extras || [], notes = [...new Set(rec?.notes || [])];
   const miss = sec.main.some((k) => gaps(rec, k).miss);
-  return `${t ? `<div class="tot"><span>Estimated parts total, A picks to C picks${miss ? '. Closest options included' : ''}</span><b>${c.money(t.low)} &ndash; ${c.money(t.high)}</b></div>` : ''}
+  return `${tot ? `<div class="tot"><span>${esc(t(miss ? 'parts.totalMiss' : 'parts.total'))}</span><b>${c.money(tot.low)} &ndash; ${c.money(tot.high)}</b></div>` : ''}
 ${c.note ? `<p class="fx">${esc(c.note)}</p>` : ''}
-<div class="cats">${sec.main.map((k) => section(k, c)).join('')}${ex.length ? `<section class="cat wide" id="cat-extras" tabindex="-1"><h4>Extras</h4><p class="need">Mission add-ons, one pick per category.</p><ul class="items">${ex.map((it, i) => card(it, i, it.category, c, false, true)).join('')}</ul></section>` : ''}</div>
-${sec.other.length ? `<div class="others"><h4>More categories</h4><div class="o-grid">${sec.other.map((k) => `<section class="cat mini" id="cat-${esc(k)}" tabindex="-1"><h5 data-tone="${tone(k)}">${esc(catLabel(k, c.kind))}</h5>${more(k, c)}</section>`).join('')}</div></div>` : ''}
-${sec.off?.length ? `<div class="others off"><h4>Other parts (not for this build)</h4><p class="need">For reference only: these fit other configurations, so they cannot be selected here.</p><div class="o-grid">${sec.off.map((k) => `<section class="cat mini" id="cat-${esc(k)}" tabindex="-1"><h5 data-tone="${tone(k)}">${esc(catLabel(k))}</h5>${more(k, c, true)}</section>`).join('')}</div></div>` : ''}
-${notes.length ? `<ul class="notes">${notes.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}`;
+<div class="cats">${sec.main.map((k) => section(k, c)).join('')}${ex.length ? `<section class="cat wide" id="cat-extras" tabindex="-1"><h4>${esc(t('cat.extras'))}</h4><p class="need">${esc(t('parts.extras.note'))}</p><ul class="items">${ex.map((it, i) => card(it, i, it.category, c, false, true)).join('')}</ul></section>` : ''}</div>
+${sec.other.length ? `<div class="others"><h4>${esc(t('parts.more.cats'))}</h4><div class="o-grid">${sec.other.map((k) => `<section class="cat mini" id="cat-${esc(k)}" tabindex="-1"><h5 data-tone="${tone(k)}">${esc(catLabel(k, c.kind))}</h5>${more(k, c)}</section>`).join('')}</div></div>` : ''}
+${sec.off?.length ? `<div class="others off"><h4>${esc(t('parts.off.title'))}</h4><p class="need">${esc(t('parts.off.note'))}</p><div class="o-grid">${sec.off.map((k) => `<section class="cat mini" id="cat-${esc(k)}" tabindex="-1"><h5 data-tone="${tone(k)}">${esc(catLabel(k))}</h5>${more(k, c, true)}</section>`).join('')}</div></div>` : ''}
+${notes.length ? `<ul class="notes">${notes.map((x) => `<li>${esc(U.text(x))}</li>`).join('')}</ul>` : ''}`;
 }
 
 const sum = (rows) => rows.reduce((a, r) => a + r.line, 0);
-const budgetLine = (total, b, c) => `${total <= b ? 'Under' : 'Over'} budget by ${c.money(Math.abs(b - total))}`;
+const budgetLine = (total, b, c) => t(total <= b ? 'bom.under' : 'bom.over', { amount: c.money(Math.abs(b - total)) });
 
 // rows = [{ key, label, it, qty, line }] in category order.
 export function bomHtml(rows, c) {
-  if (!rows.length) return `<p class="empty">Nothing selected yet. Press <b>Select</b> on one part per category to build the bill of materials. Without a selection, Export PDF lists every option ${esc(c.where)}.</p>`;
+  if (!rows.length) return `<p class="empty">${tf('bom.empty', { where: c.where })}</p>`;
   const total = sum(rows), b = c.budgetUsd;
-  return `<table class="bomt"><thead><tr><th scope="col">Category</th><th scope="col">Part</th><th scope="col" class="n">Qty</th><th scope="col" class="n">Unit</th><th scope="col" class="n">Line</th><th scope="col">Links</th></tr></thead>
-<tbody>${rows.map((r) => `<tr><td class="c" data-tone="${tone(r.key)}">${esc(r.label)}</td><th scope="row" class="p">${esc(r.it.name)}<small>${esc(r.it.brand)}</small></th><td class="n q" data-l="Qty">${r.pack ? `${r.qty} &times; ${esc(r.pack.sets)}<small>${esc(r.pack.pcs)}</small>` : r.qty}</td><td class="n u" data-l="Unit">${c.money(r.it.priceUsd)}</td><td class="n l">${c.money(r.line)}</td><td class="k">${linkBtns(r.it.links, 3)}</td></tr>`).join('')}</tbody>
-<tfoot><tr class="sum"><th scope="row" colspan="4">Total</th><td class="n">${c.money(total)}</td><td class="k"></td></tr>${b != null ? `<tr class="bud ${total <= b ? 'ok' : 'bad'}"><th scope="row" colspan="4">Budget ${c.money(b)}</th><td class="n" colspan="2">${budgetLine(total, b, c)}</td></tr>` : ''}</tfoot></table>`;
+  return `<table class="bomt"><caption class="sr">${esc(t('bom.caption'))}</caption><thead><tr><th scope="col">${esc(t('bom.col.category'))}</th><th scope="col">${esc(t('bom.col.part'))}</th><th scope="col" class="n">${esc(t('bom.col.qty'))}</th><th scope="col" class="n">${esc(t('bom.col.unit'))}</th><th scope="col" class="n">${esc(t('bom.col.line'))}</th><th scope="col">${esc(t('bom.col.links'))}</th></tr></thead>
+<tbody>${rows.map((r) => `<tr><td class="c" data-tone="${tone(r.key)}">${esc(r.label)}</td><th scope="row" class="p">${esc(r.it.name)}<small>${esc(r.it.brand)}${r.it.custom ? ` &middot; ${esc(customTxt())}` : ''}</small></th><td class="n q" data-l="${esc(t('bom.col.qty'))}">${r.pack ? `${r.qty} &times; ${esc(r.pack.sets)}<small>${esc(r.pack.pcs)}</small>` : r.qty}</td><td class="n u" data-l="${esc(t('bom.col.unit'))}">${c.money(r.it.priceUsd)}</td><td class="n l">${c.money(r.line)}</td><td class="k">${linkBtns(r.it.links, 3)}</td></tr>`).join('')}</tbody>
+<tfoot><tr class="sum"><th scope="row" colspan="4">${esc(t('bom.total'))}</th><td class="n">${c.money(total)}</td><td class="k"></td></tr>${b != null ? `<tr class="bud ${total <= b ? 'ok' : 'bad'}"><th scope="row" colspan="4">${esc(t('bom.budget', { amount: c.money(b) }))}</th><td class="n" colspan="2">${esc(budgetLine(total, b, c))}</td></tr>` : ''}</tfoot></table>`;
 }
 
 // Compact summary for the dock: every recommended category, then any other selected one.
 export function dockHtml(rows, c) {
-  if (!rows.length) return '<p class="d-empty">Pick parts to build a BOM</p>';
+  if (!rows.length) return `<p class="d-empty">${esc(t('dock.empty'))}</p>`;
   const total = sum(rows), b = c.budgetUsd, by = Object.fromEntries(rows.map((r) => [r.key, r]));
   const keys = [...c.sec.main, ...rows.map((r) => r.key).filter((k) => !c.sec.main.includes(k))];
-  return `<p class="d-tot"><span>Total &middot; ${rows.length} selected</span><b>${c.money(total)}</b></p>
-${b != null ? `<p class="d-bud ${total <= b ? 'ok' : 'bad'}">${budgetLine(total, b, c)}</p>` : ''}
-<ol class="d-list">${keys.map((k) => { const r = by[k]; return `<li${r ? ' class="on"' : ''}><a href="#cat-${esc(k)}" data-tone="${tone(k)}">${esc(catLabel(k, c.kind))}</a><span>${r ? esc(r.it.name) : k === 'esc' && c.escFree ? 'Built into the motor' : 'Not selected'}</span><b>${r ? c.money(r.line) : ''}</b></li>`; }).join('')}</ol>`;
+  return `<p class="d-tot"><span>${esc(t('dock.total'))} &middot; ${esc(t('dock.selected', { count: rows.length }))}</span><b>${c.money(total)}</b></p>
+${b != null ? `<p class="d-bud ${total <= b ? 'ok' : 'bad'}">${esc(budgetLine(total, b, c))}</p>` : ''}
+<ol class="d-list">${keys.map((k) => { const r = by[k]; return `<li${r ? ' class="on"' : ''}><a href="#cat-${esc(k)}" data-tone="${tone(k)}">${esc(catLabel(k, c.kind))}</a><span>${r ? esc(r.it.name) : k === 'esc' && c.escFree ? esc(t('dock.escBuiltIn')) : esc(t('dock.notSelected'))}</span><b>${r ? c.money(r.line) : ''}</b></li>`; }).join('')}</ol>`;
 }
 
 // Spreadsheet formula guard: a pasted line starting with = + - @ gets a leading apostrophe.
 const cell = (s) => (/^\s*[=+\-@]/.test(s) ? "'" + s : s);
 export function copyText(rows, c) {
   if (rows.length) {
-    const out = [`DRONECALC BILL OF MATERIALS${c.name ? `: ${c.name}` : ''}`];
+    const out = [`${t('copy.bomTitle')}${c.name ? `: ${c.name}` : ''}`];
     for (const r of rows) {
-      out.push(`${r.label}: ${r.it.brand} ${r.it.name} - ${r.qty} x ${r.pack ? `${r.pack.sets} (${r.pack.pcs}) at ` : ''}${c.money(r.it.priceUsd)} = ${c.money(r.line)}`);
+      out.push(`${r.label}: ${r.it.brand} ${r.it.name}${r.it.custom ? ' ' + t('copy.customTag') : ''} - ${r.qty} x ${r.pack ? t('copy.packAt', { sets: r.pack.sets, pcs: r.pack.pcs }) : ''}${c.money(r.it.priceUsd)} = ${c.money(r.line)}`);
       links(r.it.links, 3).forEach((l) => out.push(`   ${linkLabel(l)}: ${l.url}`));
     }
-    out.push(`Total: ${c.money(sum(rows))}`);
+    out.push(t('copy.total', { amount: c.money(sum(rows)) }));
     return out.map(cell).join('\n');
   }
-  const out = [`DRONECALC PARTS LIST${c.name ? `: ${c.name}` : ''}`];
+  const out = [`${t('copy.listTitle')}${c.name ? `: ${c.name}` : ''}`];
   for (const k of c.sec.main) {
     const g = gaps(c.rec, k);
     (g.miss ? g.items : c.rec[k] || []).forEach((it, i) => {
-      out.push(`${catLabel(k, c.kind)}${g.miss ? ' (closest, not a full match)' : ' (' + ('ABC'[i] || i + 1) + ')'}: ${it.brand} ${it.name} - ${c.money(it.priceUsd)}`);
+      out.push(`${catLabel(k, c.kind)}${g.miss ? ' ' + t('copy.closestTag') : ' (' + ('ABC'[i] || i + 1) + ')'}: ${it.brand} ${it.name} - ${c.money(it.priceUsd)}`);
       links(it.links, 3).forEach((l) => out.push(`   ${linkLabel(l)}: ${l.url}`));
     });
   }
-  (c.rec?.extras || []).forEach((it) => out.push(`Extra, ${catLabel(it.category)}: ${it.brand} ${it.name} - ${c.money(it.priceUsd)}`));
-  if (c.rec?.totalUsd) out.push(`Total: ${c.money(c.rec.totalUsd.low)} - ${c.money(c.rec.totalUsd.high)}`);
+  (c.rec?.extras || []).forEach((it) => out.push(`${t('copy.extra', { cat: catLabel(it.category) })}: ${it.brand} ${it.name} - ${c.money(it.priceUsd)}`));
+  if (c.rec?.totalUsd) out.push(t('copy.totalRange', { low: c.money(c.rec.totalUsd.low), high: c.money(c.rec.totalUsd.high) }));
   return out.map(cell).join('\n');
 }
 
@@ -214,19 +208,19 @@ const csvCell = (v) => `"${(typeof v === 'number' ? String(v) : /^\s*[=+\-@\t\r]
 // c adds { num(usd) -> number in c.cur, cur }. UTF-8 BOM so Excel reads non-ASCII names; CRLF per RFC 4180.
 export function bomCsv(rows, c) {
   const link = (it) => links(it.links, 1)[0]?.url || '';
-  const line = (label, it, q, pcs, total) => [label, it.brand, it.name, q, pcs, c.num(it.priceUsd), c.num(total), c.cur, link(it)];
+  const line = (label, it, q, pcs, total) => [label, it.brand, it.custom ? `${it.name} ${t('copy.customTag')}` : it.name, q, pcs, c.num(it.priceUsd), c.num(total), c.cur, link(it)];
   const out = [['Category', 'Brand', 'Part', 'Qty', 'Pieces', 'Unit price', 'Line total', 'Currency', 'Link']];
   if (rows.length) {
     rows.forEach((r) => out.push(line(r.label, r.it, r.qty, r.pack ? r.qty * r.it.packOf : r.qty, r.line)));
-    out.push(['Total', '', '', '', '', '', c.num(sum(rows)), c.cur, '']);
+    out.push([t('csv.total'), '', '', '', '', '', c.num(sum(rows)), c.cur, '']);
   } else {
     for (const k of c.sec.main) {
       const g = gaps(c.rec, k);
-      (g.miss ? g.items : c.rec?.[k] || []).forEach((it, i) => out.push(line(`${catLabel(k, c.kind)} (${g.miss ? 'closest' : 'ABC'[i] || i + 1})`, it, 1, 1, it.priceUsd)));
+      (g.miss ? g.items : c.rec?.[k] || []).forEach((it, i) => out.push(line(`${catLabel(k, c.kind)} (${g.miss ? t('csv.closest') : 'ABC'[i] || i + 1})`, it, 1, 1, it.priceUsd)));
     }
-    (c.rec?.extras || []).forEach((it) => out.push(line(`Extra, ${catLabel(it.category)}`, it, 1, 1, it.priceUsd)));
-    const t = c.rec?.totalUsd;
-    if (t) out.push(['Total, A picks', '', '', '', '', '', c.num(t.low), c.cur, ''], ['Total, C picks', '', '', '', '', '', c.num(t.high), c.cur, '']);
+    (c.rec?.extras || []).forEach((it) => out.push(line(t('csv.extra', { cat: catLabel(it.category) }), it, 1, 1, it.priceUsd)));
+    const tt = c.rec?.totalUsd;
+    if (tt) out.push([t('csv.totalA'), '', '', '', '', '', c.num(tt.low), c.cur, ''], [t('csv.totalC'), '', '', '', '', '', c.num(tt.high), c.cur, '']);
   }
   return '﻿' + out.map((r) => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }

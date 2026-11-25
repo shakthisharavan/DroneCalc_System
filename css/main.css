@@ -4,6 +4,10 @@
    DIRECTION: aircraft flight-manual spec sheet. Warm survey paper, ink rules, condensed placard caps. Right rail is a dark instrument panel
    with amber phosphor numerals; one orange accent on paper. Data first: ruled tables, tick-marked gauges, inline-SVG plots drawn like manual
    figures. No card grid, no gradients. On results the panel becomes the BOM dock; a selected part inverts to ink, like a ticked box on a form. */
+/* Self-hosted latin subsets (OFL licenses beside them in fonts/), so the site and the desktop app work offline. */
+@font-face{font-family:"Archivo";font-style:normal;font-weight:600 800;font-stretch:75%;font-display:swap;src:url('../fonts/archivo-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Atkinson Hyperlegible Next";font-style:normal;font-weight:400 600;font-display:swap;src:url('../fonts/atkinson-hyperlegible-next-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"JetBrains Mono";font-style:normal;font-weight:400 600;font-display:swap;src:url('../fonts/jetbrains-mono-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 /* Metric fallbacks: local faces scaled to the web fonts' widths so the swap does not reflow lines (widths measured in Chrome: 0.96, 0.98, 1.09). */
 @font-face{font-family:"Archivo Fallback";src:local("Arial Narrow"),local("ArialNarrow");size-adjust:96%;ascent-override:90%;descent-override:22%;line-gap-override:0%}
 @font-face{font-family:"Atkinson Fallback";src:local("Arial"),local("ArialMT"),local("Helvetica");size-adjust:98%;ascent-override:96%;descent-override:25%;line-gap-override:0%}
@@ -18,19 +22,19 @@
 :root{
   --paper:light-dark(#e9e4d4,#1c2024); --paper-2:light-dark(#dfd9c6,#262b30); --sheet:light-dark(#f3efe2,#22272c);
   --ink:light-dark(#14181c,#e8e3d3); --ink-2:light-dark(#3c434a,#b3ae9e); --rule:light-dark(rgba(20,24,28,.28),rgba(232,227,211,.26));
-  --accent:light-dark(#b53a08,#f0875c); --ok:light-dark(#2b6a3d,#7fd39a); --bad:light-dark(#a3231a,#ff8a70);
+  --accent:light-dark(#aa3708,#f0875c); --ok:light-dark(#2b6a3d,#7fd39a); --bad:light-dark(#a3231a,#ff8a70);
   /* Text on --accent fills, and on --amber fills (amber is the same in both themes, so its text stays dark). */
   --on-accent:light-dark(#fff,#14181c); --on-amber:#14181c;
   /* Inverted surface: section bands, table heads, checked choices, selected parts. Ink in light; a raised graphite in dark. */
   --inv:light-dark(#14181c,#353c43); --inv-ink:light-dark(#e9e4d4,#f3efe2);
   /* Category and series accents. Fill = graphics (3:1 on sheet); -ink = text on paper (>= 4.5:1); -lite = text on the dark panel. Light --blue, --mustard, --teal match charts.js PAL; perf.css remaps PAL attributes to these. */
-  --blue:light-dark(#1f66ad,#5d9de2); --blue-ink:light-dark(#1a4f86,#8fbdf0); --teal:light-dark(#14907c,#2db59c); --teal-ink:light-dark(#0b6557,#6fd0bd); --teal-lite:#6fd0bd;
-  --mustard:light-dark(#b07208,#d39a2c); --mustard-ink:light-dark(#6e4700,#eec064); --mustard-lite:#f0c060; --slate:light-dark(#5d7286,#8398ac); --slate-ink:light-dark(#3b4e5e,#aabdcd); --slate-lite:#9fb3c4;
+  --blue:light-dark(#1f66ad,#5d9de2); --blue-ink:light-dark(#1a4f86,#8fbdf0); --teal:light-dark(#128472,#2db59c); --teal-ink:light-dark(#0b6557,#6fd0bd); --teal-lite:#6fd0bd;
+  --mustard:light-dark(#a36907,#d39a2c); --mustard-ink:light-dark(#6e4700,#eec064); --mustard-lite:#f0c060; --slate:light-dark(#5d7286,#8398ac); --slate-ink:light-dark(#3b4e5e,#aabdcd); --slate-lite:#9fb3c4;
   /* The instrument panel is dark in both themes; only its edge shows in dark, where the sheet is dark too. */
   --panel:#14181c; --panel-2:#1d2328; --panel-line:#3a4249; --amber:#ffb000; --panel-ink:#d8d4c4; --panel-dim:#a9a692; --ink-on:light-dark(#bdb8a6,#c9c4b3);
   --panel-edge:light-dark(transparent,#3a4249); --ok-lite:#7fd39a; --bad-lite:#ff8a70;
   /* Families. Names kept from v2: perf.css and charts read --head and --mono. */
-  --head:"Archivo","Archivo Fallback","Arial Narrow",sans-serif; --body:"Atkinson Hyperlegible Next","Atkinson Fallback",Arial,sans-serif; --mono:"JetBrains Mono","JetBrains Mono Fallback",ui-monospace,Consolas,monospace;
+  --head:"Archivo","Archivo Fallback","Arial Narrow","Nirmala UI","Kohinoor Devanagari","Noto Sans Devanagari","Mangal",sans-serif; --body:"Atkinson Hyperlegible Next","Atkinson Fallback",Arial,"Nirmala UI","Kohinoor Devanagari","Noto Sans Devanagari","Mangal",sans-serif; --mono:"JetBrains Mono","JetBrains Mono Fallback",ui-monospace,Consolas,"Nirmala UI","Kohinoor Devanagari","Noto Sans Devanagari","Mangal",monospace;
   /* Type scale (16px root). Headings: display > h1 > h2 > h3. Text: body > small > caption > micro. Figures: data-lg > data > data-s. */
   --t-display:clamp(2.125rem,1.35rem + 3.1vw,3.25rem); --t-h1:clamp(1.375rem,1.05rem + 1.3vw,1.875rem); --t-h2:1.375rem; --t-h3:1.125rem;
   --t-body:1.0625rem; --t-body-s:1rem; --t-small:.875rem; --t-caption:.8125rem; --t-micro:.75rem;
@@ -39,6 +43,10 @@
   --t-data-lg:1.75rem; --t-data:1.375rem; --t-data-s:1.125rem;
   --pad:clamp(16px,3vw,40px); --max:2200px;
   --ext:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 8.5 8.5 1.5M3.5 1.5h5v5' fill='none' stroke='%23000' stroke-width='1.8'/%3E%3C/svg%3E");
+}
+/* Browsers without light-dark() (before Chrome 123, Firefox 120, Safari 17.5) would drop every token to unset; give them the light values. A plain declaration above the block cannot do it: custom properties always parse, so the later light-dark() one would win. */
+@supports not (color:light-dark(#000,#fff)){
+  :root{--paper:#e9e4d4;--paper-2:#dfd9c6;--sheet:#f3efe2;--ink:#14181c;--ink-2:#3c434a;--rule:rgba(20,24,28,.28);--accent:#aa3708;--ok:#2b6a3d;--bad:#a3231a;--on-accent:#fff;--inv:#14181c;--inv-ink:#e9e4d4;--blue:#1f66ad;--blue-ink:#1a4f86;--teal:#128472;--teal-ink:#0b6557;--mustard:#a36907;--mustard-ink:#6e4700;--slate:#5d7286;--slate-ink:#3b4e5e;--ink-on:#bdb8a6;--panel-edge:transparent}
 }
 *{box-sizing:border-box}
 html{background:var(--paper);color:var(--ink);font:400 100%/1.5 var(--body);-webkit-text-size-adjust:100%;scrollbar-color:var(--ink-2) var(--paper-2);scroll-behavior:smooth}
@@ -49,6 +57,8 @@ p,li{text-wrap:pretty}
 h1,h2,h3,h4,h5{font-family:var(--head);font-stretch:75%;text-transform:uppercase;letter-spacing:.03em;margin:0;line-height:1.05;text-wrap:balance}
 button,input,select{font:inherit;color:inherit}
 input,select{caret-color:var(--accent)}
+/* The browser default placeholder grey is about 2:1 on the sheet; ink-2 is >= 4.5:1 and the field label still carries the name. */
+::placeholder{color:var(--ink-2);opacity:1}
 a{text-underline-offset:3px}
 ::selection{background:var(--amber);color:var(--on-amber)}
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
@@ -133,7 +143,7 @@ a{text-underline-offset:3px}
 .cfg-warn:empty{display:none}
 .mat-warn{grid-column:1/-1;margin:0}
 .cfg-warn li{padding:10px 14px;border:2px solid var(--bad);background:color-mix(in srgb,var(--bad) 12%,var(--sheet));margin-top:6px;font-size:var(--t-small)}
-.cfg-warn li::before{content:"CAUTION ";font:600 var(--t-micro) var(--mono);letter-spacing:.1em;color:var(--bad)}
+.cfg-warn li::before{content:var(--w-caution,"CAUTION ");font:600 var(--t-micro) var(--mono);letter-spacing:.1em;color:var(--bad)}
 /* FPV size cards: the size is the headline, then the two numbers that differ between classes. */
 .fpv .hint{margin-bottom:6px}
 .fpvs{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
@@ -212,7 +222,7 @@ dl.rows{margin:0}
 .gauge.good .fill{background:#6bd68f}
 .warns{margin:16px 0 0;padding:0;list-style:none;font-size:var(--t-small)}
 .warns li{padding:8px 10px;border:1px solid #ff6a4d;background:var(--panel-2);margin-top:6px;color:#f1c9c0}
-.warns li::before,.rwarns li::before{content:"CAUTION ";font:600 var(--t-micro) var(--mono);letter-spacing:.1em;color:#ff6a4d}
+.warns li::before,.rwarns li::before{content:var(--w-caution,"CAUTION ");font:600 var(--t-micro) var(--mono);letter-spacing:.1em;color:#ff6a4d}
 .rwarns li::before{color:var(--bad)}
 .panel .idle{color:var(--panel-dim);font-size:var(--t-small)}
 
@@ -319,6 +329,8 @@ dl.rows{margin:0}
 .d-empty{margin:8px 0 16px;font-size:var(--t-small);color:var(--panel-dim)}
 .badge{display:inline-flex;align-items:center;min-height:28px;padding:2px 8px;border:1px solid currentColor;font:600 var(--t-micro) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label);color:var(--ink-2)}
 .badge.on{color:var(--ok)}
+/* Custom part (user-entered, not from the catalog): muted mustard warning, no buy link behind it. */
+.badge.cust{color:var(--mustard-ink);background:color-mix(in srgb,var(--mustard) 12%,transparent)}
 /* Select toggle: an empty box; pressed, the box fills and ticks. */
 .sel{margin-left:auto;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:6px 14px;border:2px solid var(--ink);background:var(--sheet);font:700 var(--t-small) var(--head);text-transform:uppercase;letter-spacing:.08em;cursor:pointer;transition:background .15s,color .15s,border-color .15s,transform .1s}
 .sel svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor}
@@ -332,7 +344,7 @@ dl.rows{margin:0}
 .it.on,.opt.on{background:var(--inv);color:var(--inv-ink)}
 .it.on .meta,.opt.on .meta,.on .pr small{color:var(--ink-on)}
 .it.on .rk,.it.on .tag{color:var(--amber)}
-.on .badge{color:var(--ink-on)} .on .badge.on{color:var(--ok-lite)}
+.on .badge{color:var(--ink-on)} .on .badge.on{color:var(--ok-lite)} .on .badge.cust{color:var(--mustard-lite)}
 .on a.btn.buy{color:var(--inv-ink);border-color:var(--inv-ink)}
 .on a.btn.buy::after{background:var(--amber)}
 .on a.btn.buy:hover,.on a.btn.buy:focus-visible{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
@@ -443,6 +455,16 @@ dl.rows{margin:0}
 .mast-sub{margin-right:auto}
 .theme-tog,.lib-tog{align-self:center;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:44px;min-height:44px;padding:0 12px;border:2px solid var(--ink);background:none;cursor:pointer;font:600 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label);transition:background .15s,color .15s}
 .theme-tog:hover,.lib-tog:hover,.lib-tog[aria-expanded="true"]{background:var(--ink);color:var(--paper)}
+/* Units toggle: two joined buttons, the pressed one inked. Same height and type as the other header tools; the focus ring is the global :focus-visible outline. */
+.unit-tog{align-self:center;display:inline-flex}
+.unit-tog button{min-height:44px;padding:0 12px;border:2px solid var(--ink);background:none;color:inherit;cursor:pointer;font:600 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label)}
+.unit-tog button+button{margin-left:-2px}
+.unit-tog button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.unit-tog button:focus-visible{position:relative;z-index:1}
+/* Language selector (i18n): a labelled native select beside the unit toggle, same height and type as the other header tools. Option labels are in their own language. */
+.lang-tog{align-self:center;display:inline-flex;align-items:center;gap:6px}
+.lang-tog label{font:600 var(--t-label) var(--mono);text-transform:uppercase;letter-spacing:var(--tr-label)}
+.lang-tog select{min-height:44px;padding:0 10px;border:2px solid var(--ink);background:var(--paper);color:inherit;cursor:pointer;font:600 var(--t-label) var(--mono)}
 /* Glyph drawn in CSS and shows the current theme: a crescent in light, a disc with a dotted ray ring in dark. The button carries the text label. */
 .theme-tog::before{content:"";flex:none;width:14px;height:14px;border-radius:50%;box-shadow:inset -5px -3px 0 0 currentColor}
 .theme-tog[aria-pressed="true"]::before{width:10px;height:10px;margin:2px;background:currentColor;box-shadow:none;outline:2px dotted currentColor;outline-offset:2px}
@@ -478,8 +500,8 @@ dl.rows{margin:0}
 .bat dd small{margin-left:3px;font-size:var(--t-caption);color:var(--ink-2)}
 .bat-flag{--f:var(--mustard);--fi:var(--mustard-ink);margin:0 0 6px;padding:10px 14px;max-width:75ch;border:2px solid var(--f);background:color-mix(in srgb,var(--f) 12%,var(--sheet));font-size:var(--t-small)}
 .bat-flag[data-lvl=bad]{--f:var(--bad);--fi:var(--bad)}
-.bat-flag::before{content:"CHECK ";font:600 var(--t-micro) var(--mono);letter-spacing:.1em;color:var(--fi)}
-.bat-flag[data-lvl=bad]::before{content:"CAUTION "}
+.bat-flag::before{content:var(--w-check,"CHECK ");font:600 var(--t-micro) var(--mono);letter-spacing:.1em;color:var(--fi)}
+.bat-flag[data-lvl=bad]::before{content:var(--w-caution,"CAUTION ")}
 
 /* Compatibility list: a ruled table of findings; the word in <b> plus a glyph box carry the level. */
 .checks{list-style:none;margin:0 0 14px;padding:0;border:2px solid var(--ink);background:var(--sheet)}
@@ -496,7 +518,7 @@ dl.rows{margin:0}
 .mass,.cost{margin:0 0 10px;max-width:75ch;font:400 var(--t-caption)/1.5 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink-2)}
 .mass{color:var(--ink)}
 .mass[data-lvl=warn]{color:var(--mustard-ink)}
-.mass[data-lvl=warn]::before{content:"CHECK ";font-weight:600;letter-spacing:.1em}
+.mass[data-lvl=warn]::before{content:var(--w-check,"CHECK ");font-weight:600;letter-spacing:.1em}
 .field.mw{max-width:320px;margin:16px 0 18px}
 
 /* Part card deltas against the best pick: sign in the text, tone as a second cue. */
@@ -518,11 +540,11 @@ details.checklist{border:2px solid var(--ink);background:var(--sheet)}
 .cl li:first-child{border-top:0}
 .cl li::marker{font:500 var(--t-caption) var(--mono);color:var(--ink-2)}
 
-/* Glossary "?": a 20 px ring with a 32 px hit area; the note opens below as a panel readout, like the chart tooltip.
+/* Glossary "?": a 24 px ring (the WCAG 2.2 minimum target) with a 36 px hit area; the note opens below as a panel readout, like the chart tooltip.
    The note's box is the sheet (.shell), not the trigger, so ruled strips with overflow:hidden never clip it. With anchor positioning it hangs
    under the trigger and flips to end at the trigger's right edge when it would overrun the sheet; without it, it opens at the trigger's static spot. */
 details.gl{display:inline-block;margin-left:6px;vertical-align:middle;text-transform:none;letter-spacing:0;font-stretch:100%;anchor-scope:--gl}
-.gl>summary{anchor-name:--gl;position:relative;display:grid;place-items:center;width:20px;height:20px;border:1.5px solid currentColor;border-radius:50%;cursor:help;list-style:none;font:600 12px/1 var(--mono);color:var(--ink-2)}
+.gl>summary{anchor-name:--gl;position:relative;display:grid;place-items:center;width:24px;height:24px;border:1.5px solid currentColor;border-radius:50%;cursor:help;list-style:none;font:600 12px/1 var(--mono);color:var(--ink-2)}
 .gl>summary::-webkit-details-marker{display:none}
 .gl>summary::after{content:"";position:absolute;inset:-6px}
 .gl>summary:hover,.gl[open]>summary{background:var(--ink);border-color:var(--ink);color:var(--paper)}
@@ -603,17 +625,29 @@ details.gl{display:inline-block;margin-left:6px;vertical-align:middle;text-trans
   .tot b{font-size:var(--t-data)}
   .dock-n{display:none}
 }
-@media (prefers-reduced-motion:reduce){*{transition:none!important}html{scroll-behavior:auto}}
+@media (prefers-reduced-motion:reduce){*,::before,::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+/* More contrast asked for: rules and borders at full ink, secondary text at full ink, thicker focus ring. Tokens only, so every component follows. */
+@media (prefers-contrast:more){
+  :root{--rule:currentColor;--ink-2:var(--ink);--panel-dim:var(--panel-ink)}
+  :focus-visible{outline-width:4px}
+  .btn,.sel,.inp,.pf-btn{border-width:3px}
+}
 @media print{
   /* Print is the light sheet whatever the theme: forcing the scheme resolves every light-dark() token to its light value. */
   :root,:root[data-theme]{color-scheme:light!important}
   html{background:#fff}
-  .mast-sub,.panel,.rail,.nav,.skip,.noprint,.theme-tog,.lib-tog,.lib,.gl,.s-perf,.kpis,.rwarns,.dock,.more,.sel,.others,.badge{display:none!important}
+  .mast-sub,.panel,.rail,.nav,.skip,.noprint,.theme-tog,.unit-tog,.lang-tog,.lib-tog,.lib,.gl,.s-perf,.kpis,.rwarns,.dock,.more,.sel,.others,.badge:not(.cust){display:none!important}
   .shell,.res-grid,.col-parts{display:block}
   .stage{padding:0}
   .btn{display:none}
+  .on .badge.cust,.badge.cust{color:#000;background:none;border:1px solid #000} /* the unverified-part mark must survive the print */
   .lk a{display:block;font:400 var(--t-micro) var(--mono);text-decoration:none;color:#000;border:0;padding:0;min-height:0}
   .lk a::after{content:" " attr(href);width:auto;height:auto;margin:0;background:none;-webkit-mask:none;mask:none}
   .it.on,.opt.on{background:none;color:#000;outline:2px solid #000}
   .cat h4,.cat.mini h5,.wiring h4{border-top-color:#000;border-bottom:1px solid #000}
 }
+/* Hindi (Devanagari): uppercase and letter-spacing do not apply to the script and spaced letters break its joined strokes; taller lines keep the above-and-below marks from colliding. */
+:lang(hi) *{text-transform:none!important;letter-spacing:normal!important}
+:lang(hi) body{line-height:1.7}
+:lang(hi) h1,:lang(hi) h2,:lang(hi) h3,:lang(hi) h4,:lang(hi) h5{line-height:1.4;font-stretch:100%}
+:lang(hi) .btn,:lang(hi) .kpi dt,:lang(hi) .ro dt,:lang(hi) .field>label,:lang(hi) .rail span,:lang(hi) .unit-tog button,:lang(hi) .lang-tog label,:lang(hi) .lib-tog,:lang(hi) .hint,:lang(hi) small{line-height:1.5}

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { CATALOG, CURRENCIES, RATES_NOTE, REGIONS, regionForCurrency, toUsd, fromUsd, formatMoney, localLinks } from "../js/catalog.js";
+import { CATALOG, CUSTOM, allParts, CURRENCIES, ratesNote, REGIONS, regionForCurrency, toUsd, fromUsd, formatMoney, localLinks } from "../js/catalog.js";
 import { recommend, listOptions } from "../js/matcher.js";
 
 const CATS = ["frame", "motor", "esc", "fc", "battery", "prop", "camera", "vtx", "gps", "radio", "payload", "vtol", "servo", "sensor", "fixedwing", "tilt"];
@@ -28,7 +28,7 @@ assert.equal(formatMoney(5, "XXX", { iso: true }), "USD 5.00", "unknown currency
 assert.equal(formatMoney(5, undefined, { iso: true }), "USD 5.00");
 assert.equal(formatMoney(5, "__proto__", { iso: true }), "USD 5.00");
 assert.equal(toUsd(10, "XXX"), 10);
-assert.ok(RATES_NOTE.includes("2026-11-06") && RATES_NOTE.includes("Verify at checkout"), "rates note");
+assert.ok(ratesNote().includes("2026-11-06") && ratesNote().includes("Verify at checkout"), "rates note");
 
 // ---- regions and store search templates ----
 assert.deepEqual(Object.keys(REGIONS).sort(), [...REG_CODES].sort());
@@ -364,6 +364,16 @@ for (const inch of [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 17, 18, 20, 22])
 const motorHas = (st, pusher) => CATALOG.some((i) => i.category === "motor" && i.specs.statorMm === st && i.tags.includes("pusher") === pusher);
 for (const st of ["2807", "2814", "4006", "6007"]) assert.ok(motorHas(st, false), "lift " + st);
 for (const st of ["2312", "4130"]) assert.ok(motorHas(st, true), "pusher " + st);
+
+// ---- custom parts (F7): the registry starts empty, never leaks into CATALOG, and its parts get no links (ui/custom.js holds the validation tests)
+{
+  assert.equal(CUSTOM.length, 0, "no custom parts by default"); assert.equal(allParts(), CATALOG, "empty registry: the catalog itself");
+  const c = { id: "custom-t1", category: "motor", name: "T", brand: "B", priceUsd: 1, weightG: 1, specs: {}, tags: ["fpv"], links: [], regions: [], custom: true };
+  assert.deepEqual(localLinks(c, "US"), [], "custom: no store links, not even searches");
+  CUSTOM.push(c);
+  try { assert.deepEqual(allParts(), [...CATALOG, c]); assert.ok(CATALOG.every((i) => !i.custom), "CATALOG untouched"); } finally { CUSTOM.length = 0; }
+  assert.equal(allParts(), CATALOG);
+}
 
 const prod = CATALOG.reduce((n, i) => n + i.links.length, 0);
 console.log("catalog tests ok:", CATALOG.length, "items;", prod, "product links; local listings", JSON.stringify(counts), "; engine runs", live);

@@ -7,3 +7,5 @@ node_modules/
 /engine
 /pdf
 /perf
+# desktop build output
+dist/

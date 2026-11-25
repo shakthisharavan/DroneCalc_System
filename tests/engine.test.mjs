@@ -164,7 +164,8 @@ t("altitude and temperature raise power, battery and rated thrust", () => {
   assert.ok(high.batteryWh > sea.batteryWh);
   assert.ok(high.thrustPerMotorG > sea.thrustPerMotorG);
   assert.ok(hot.hoverPowerW > sea.hoverPowerW && hot.batteryWh > sea.batteryWh);
-  assert.ok(cold.hoverPowerW < sea.hoverPowerW);
+  // v5: cold air is denser (less power per gram) but the cold-derated pack must be bigger, and its extra mass wins: hover power rises
+  assert.ok(cold.airDensity > sea.airDensity && cold.batteryWh > sea.batteryWh);
   assert.ok(high.warnings.some((w) => /thin|hot/i.test(w)));
   assert.ok(run(e(0, 15, 8)).avgPowerW > sea.avgPowerW);
 });
@@ -710,7 +711,7 @@ t("hardware: ESC links match motors, connectors follow the FC size, hex adds two
     assert.ok(row(r, "GPS") && r.weights.hardwareG >= 30 && r.weights.hardwareG <= 200, configuration + " GPS and hardware " + r.weights.hardwareG);
     const servos = { vtol: r.vtol?.servoCount, tiltrotor: (r.vtol?.servoCount ?? 0) + 4, fixedwing: 4 }[configuration];
     assert.equal(row(r, "Servo leads")?.count, servos, configuration + " servo leads");
-    assert.ok(r.wiring.every((w) => w.count > 0 && w.lengthMm > 0 && Object.keys(w).sort().join() === "connector,count,lengthMm,name"), configuration);
+    assert.ok(r.wiring.every((w) => w.count > 0 && w.lengthMm > 0 && Object.keys(w).sort().join() === "connector,count,id,lengthMm,name"), configuration);
   }
   const q = run({ payloadKg: 0.5, targetFlightMin: 30 }), h = run({ payloadKg: 0.5, targetFlightMin: 30, configuration: "hex" });
   assert.ok(Math.abs(h.weights.hardwareG - q.weights.hardwareG - (2 * perMotor + xt(h) - xt(q))) <= 1.5, `hex ${h.weights.hardwareG} vs quad ${q.weights.hardwareG} g`);

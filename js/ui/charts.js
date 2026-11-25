@@ -5,9 +5,11 @@
 
 // Identity colours (first three categorical slots only), validated with the dataviz validate_palette.js on the
 // #f3efe2 figure surface, all pairs: CVD dE >= 11.5, normal-vision dE >= 16.6, contrast >= 3.9:1.
-// Labels set inside these fills are white (APCA |Lc| >= 72).
-export const PAL = { blue: '#1f66ad', ochre: '#b07208', teal: '#14907c' };
+// Labels set inside these fills are white (APCA |Lc| >= 72; WCAG 4.5:1 on all three).
+export const PAL = { blue: '#1f66ad', ochre: '#a36907', teal: '#128472' };
 
+import * as U from './units.js';
+import { t } from '../i18n/i18n.js';
 const fin = Number.isFinite;
 const q = (v) => (fin(v) ? Math.round(v * 10) / 10 : 0); // svg coordinate, never NaN
 // Caps for the leading words only, so units keep their case ("MAX 4,770 g", not "G").
@@ -80,14 +82,26 @@ const xAxis = (xa, X, y, W, L, R, H, x) => steps(xa, xa.step).map((v) => text(X(
   text((L + W - R) / 2, H - 5, esc(x.label.toUpperCase()) + unit(x.unit), 'xt', ' text-anchor="middle"');
 const bug = '<g class="xb"><rect height="17" rx="2"/><text text-anchor="middle"></text></g>';
 
+// Display units: s.q maps a row key to a units.js quantity. Rows, marks, zones, reference lines and the axis units are converted here once,
+// so every figure shares one path; in metric the spec comes back untouched.
+function disp(s) {
+  if (!s.q || !U.isImperial()) return s;
+  const xk = s.x.key, f = (k, v) => (s.q[k] ? U.toDisplay(s.q[k], v) : v), row = (r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, f(k, v)])), lb = (k, u) => (s.q[k] ? U.label(s.q[k]) : u);
+  return { ...s, rows: s.rows.map(row), x: { ...s.x, unit: lb(xk, s.x.unit), lo: f(xk, s.x.lo), hi: f(xk, s.x.hi) },
+    panels: s.panels.map((p) => ({ ...p, unit: lb(p.key, p.unit), refs: p.refs?.map((r) => ({ ...r, y: f(p.key, r.y) })) })),
+    marks: (s.marks || []).map((m) => ({ ...m, x: f(xk, m.x) })), zones: (s.zones || []).map((z) => ({ ...z, x0: f(xk, z.x0), x1: f(xk, z.x1) })),
+    ...(s.over ? { over: { ...s.over, rows: s.over.rows.map(row) } } : {}) };
+}
 /**
  * Small multiples on one shared x axis (line figures 1-4).
  * s = { rows, x:{key,label,unit,lo?,hi?},
  *       panels:[{key,label,unit,w,refs:[{y,label,kind:'ref'|'lim',at:'l'|'r'}],end?}],
- *       marks:[{x,label,kind:'build'|'ref'|'lim',dots?:[panel idx],vals?:[label per panel]}], zones:[{x0,x1,label}] }
+ *       marks:[{x,label,kind:'build'|'ref'|'lim',dots?:[panel idx],vals?:[label per panel]}], zones:[{x0,x1,label}],
+ *       over?:{ rows } }  over = a second set of rows on the same x key (strictly increasing), drawn dashed ochre behind the main curve in every panel whose key they carry
  * -> { inner, w, h, geo:{ w, xs, ys, top, bot, L, R } }  (geo drives crosshair and hit testing)
  */
 export function panels(s, W, id) {
+  s = disp(s);
   const narrow = W < 440, L = narrow ? 46 : 52, R = narrow ? 12 : 18, B = 36, ROW = 19, rows = s.rows, xk = s.x.key;
   const X0 = rows[0][xk], X1 = rows[rows.length - 1][xk];
   const xa = nice(s.x.lo ?? (X0 <= 0.35 * X1 ? 0 : X0), s.x.hi ?? X1, Math.max(3, Math.round((W - L - R) / 84)));
@@ -107,7 +121,8 @@ export function panels(s, W, id) {
     const h = (avail * (p.w || 1)) / sw, y0 = y + ROW, y1 = y0 + h;
     y = y1;
     const vals = rows.map((r) => r[p.key]), refs = (p.refs || []).filter((r) => fin(r.y));
-    const ya = nice(Math.min(0, ...vals), Math.max(...vals, ...refs.map((r) => r.y)) * (p.end ? 1.2 : 1.08) || 1, Math.max(2, Math.floor(h / 30)));
+    const ov = s.over?.rows, ovOk = Array.isArray(ov) && ov.length > 1 && ov.every((r, i) => fin(r?.[xk]) && fin(r[p.key]) && (!i || r[xk] > ov[i - 1][xk])), ovv = ovOk ? ov.map((r) => r[p.key]) : [];
+    const ya = nice(Math.min(0, ...vals, ...ovv), Math.max(...vals, ...ovv, ...refs.map((r) => r.y)) * (p.end ? 1.2 : 1.08) || 1, Math.max(2, Math.floor(h / 30)));
     const Y = (v) => y1 - ((v - ya.lo) / (ya.hi - ya.lo)) * h;
     const ym = Y(ya.lo) - Y(ya.lo + ya.minor) >= 6 ? steps(ya, ya.minor) : [];
     grid += xm.map((v) => `<path class="mn" d="M${q(X(v))} ${q(y0)}V${q(y1)}"/>`).join('') + ym.map((v) => `<path class="mn" d="M${L} ${q(Y(v))}H${W - R}"/>`).join('') +
@@ -121,6 +136,8 @@ export function panels(s, W, id) {
       if (!j && z.label && b - a >= tw(z.label) + 12) over += text(b - 6, y1 - 7, esc(z.label.toUpperCase()), 'zl h', ' text-anchor="end"');
     }
     const c = curve(rows, xk, p.key);
+    // plain attributes, no class: the overlay needs no stylesheet (a class rule would beat them)
+    if (ovOk) body += `<path class="cvo" d="${curve(ov, xk, p.key).path(X, Y)}" fill="none" stroke="${PAL.ochre}" stroke-width="2" stroke-dasharray="6 4" stroke-linecap="round" stroke-linejoin="round"/>`;
     body += `<path class="cv" d="${c.path(X, Y)}"/>`;
     for (const r of refs) {
       const ry = Y(r.y), left = r.at === 'l';
@@ -213,7 +230,7 @@ export function phases(s, W, id) {
     out += `<path class="${b ? 'bd' : 'ld'}" d="M${q(x)} ${q(base - 8)}V${q(b ? y1 : segs[i].top)}"/>`;
     over += text(x0 + 1, base, b ? esc(caps(s.mark.label)) : lab[i], `fl h${b ? ' b' : ''}`);
   });
-  out += xAxis(xa, X, y1 + BAND + 4, W, L, R, H, s.x) + text(L, y0 - 6, 'POWER' + unit('W'), 'pl h') + over;
+  out += xAxis(xa, X, y1 + BAND + 4, W, L, R, H, s.x) + text(L, y0 - 6, esc(t('chart.power').toUpperCase()) + unit('W'), 'pl h') + over;
   return { inner: out, w: W, h: H, geo: { w: W, segs, top: y0, bot: y1 } };
 }
 
@@ -222,8 +239,8 @@ export function phases(s, W, id) {
  * s = { parts:[{label,g,color}], groups:[{label,a,b}] (a..b in grams from the left), total }
  */
 export function massBar(s, W) {
-  const L = 2, R = 16, BAR = 28, X = (g) => L + (g / s.total) * (W - L - R);
-  const gl = s.groups.map((g) => `${g.label} ${fmt(g.b - g.a)} g`);
+  const L = 2, R = 16, BAR = 28, X = (g) => L + (g / s.total) * (W - L - R), k = U.toDisplay('g', 1), mg = (g) => `${fmt(U.toDisplay('g', g), U.dx('g'))} ${U.label('g')}`; // k: display units per gram
+  const gl = s.groups.map((g) => `${g.label} ${mg(g.b - g.a)}`);
   const { pos, n } = pack(s.groups.map((g, i) => ({ x0: (X(g.a) + X(g.b)) / 2 - (tw(gl[i]) + 2) / 2, w: tw(gl[i]) + 2 })), 2, W - R);
   const by = 14 + n * 15, H = by + BAR + 42;
   let out = '', a = 0;
@@ -242,20 +259,20 @@ export function massBar(s, W) {
     if (t) out += text(x0 + 7, by + 18, esc(t), 'sl');
     return { x0, x1, cx: (x0 + x1) / 2, top: by };
   });
-  const ga = nice(0, s.total, Math.max(2, Math.round((W - L - R) / 90))), end = X(s.total);
-  out += steps(ga, ga.step).filter((v) => v < s.total && X(v) < end - 60).map((v) => `<path class="tm" d="M${q(X(v))} ${by + BAR + 2}v5"/>` +
-    text(Math.max(X(v), L + 4), by + BAR + 18, tick(v, ga), 'tk', v ? ' text-anchor="middle"' : '')).join('') +
-    `<path class="bd" d="M${q(end - 0.75)} ${by - 2}V${by + BAR + 9}"/>` + text(end, by + BAR + 34, `TAKEOFF ${fmt(s.total)} g`, 'vb', ' text-anchor="end"');
+  const ga = nice(0, s.total * k, Math.max(2, Math.round((W - L - R) / 90))), end = X(s.total); // ticks in display units, placed by their gram value
+  out += steps(ga, ga.step).filter((v) => v < s.total * k && X(v / k) < end - 60).map((v) => `<path class="tm" d="M${q(X(v / k))} ${by + BAR + 2}v5"/>` +
+    text(Math.max(X(v / k), L + 4), by + BAR + 18, tick(v, ga), 'tk', v ? ' text-anchor="middle"' : '')).join('') +
+    `<path class="bd" d="M${q(end - 0.75)} ${by - 2}V${by + BAR + 9}"/>` + text(end, by + BAR + 34, `TAKEOFF ${mg(s.total)}`, 'vb', ' text-anchor="end"');
   return { inner: out, w: W, h: H, geo: { w: W, segs, top: by, bot: by + BAR } };
 }
 
 /** General arrangement, top view (nose up), to scale from span and wing area; fuselage, booms and tail are schematic.
  *  o = { kind:'quadplane'|'tilt'|'wing', liftIn (rotor prop), pushIn (pusher prop), propIn (wing motor prop), tiltDeg, W } */
 export function planform(v, o = {}) {
-  const W = o.W || 260, kind = o.kind || 'quadplane', span = v.wingspanMm, s = (W - 20) / span, cx = W / 2, c = ((v.wingAreaDm2 * 1e4) / span) * s, hx = (span / 2) * s;
+  const fm = (mm) => `${fmt(U.toDisplay('mm', mm), U.dx('mm'))} ${U.label('mm')}`, W = o.W || 260, kind = o.kind || 'quadplane', span = v.wingspanMm, s = (W - 20) / span, cx = W / 2, c = ((v.wingAreaDm2 * 1e4) / span) * s, hx = (span / 2) * s;
   const dim = (wy) => `<path class="ext" d="M${q(cx - hx)} ${q(wy - 3)}V8M${q(cx + hx)} ${q(wy - 3)}V8"/><path class="dim" d="M${q(cx - hx)} 13H${q(cx + hx)}M${q(cx - hx - 4)} 17l8 -8M${q(cx + hx - 4)} 17l8 -8"/>` +
-    text(cx, 10, `SPAN ${fmt(span)} mm`, 'fl h', ' text-anchor="middle"');
-  const svg = (H, body) => `<svg class="pf-ga-svg" viewBox="0 0 ${W} ${Math.round(H)}" width="${W}" height="${Math.round(H)}" role="img" aria-label="Planform to scale: span ${fmt(span)} mm, mean chord ${fmt(c / s)} mm, aspect ratio ${fmt(v.aspectRatio, 1)}.">${body}</svg>`;
+    text(cx, 10, `${esc(t('chart.span').toUpperCase())} ${fm(span)}`, 'fl h', ' text-anchor="middle"');
+  const svg = (H, body) => `<svg class="pf-ga-svg" viewBox="0 0 ${W} ${Math.round(H)}" width="${W}" height="${Math.round(H)}" role="img" aria-label="${esc(t('chart.planform', { span: fm(span), chord: fm(c / s), ar: fmt(v.aspectRatio, 1) }))}">${body}</svg>`;
   const wing = (wy) => `<rect class="wg" x="${q(cx - hx)}" y="${q(wy)}" width="${q(2 * hx)}" height="${q(c)}" rx="2"/>`;
   if (kind === 'wing') { // conventional layout: fuselage ~0.6 span, wing at a quarter of it, tail at the end, tractor prop at the nose
     const fl = 0.6 * span * s, fw = Math.max(5, 0.05 * span * s), ny = 30, wy = ny + 0.22 * fl, tc = 0.7 * c, th = 0.17 * span * s, ty = ny + fl - tc;
@@ -283,6 +300,6 @@ export function planform(v, o = {}) {
   body += `<path class="ext" d="M8 ${q(H + 4)}H${W - 8}"/><path class="wg" d="M${q(px - 6)} ${q(py + 4)}H${q(px + 44)}"/>` +
     `<path class="ext" d="M${q(px)} ${q(py)}V${q(py - L)}"/><path class="rt" d="${disc(px, py - L, 0)}"/>` +
     `<path class="bm" d="M${q(px)} ${q(py)}L${q(tip[0])} ${q(tip[1])}"/><path class="pu" d="${disc(tip[0], tip[1], a)}"/><path class="dim" d="${arc}"/><circle class="hb" cx="${q(px)}" cy="${q(py)}" r="2.5"/>` +
-    text(px + 52, py - 16, `TILT ${fmt(deg)}°`, 'fl h') + text(px + 52, py - 2, 'SIDE VIEW', 'fl h');
+    text(px + 52, py - 16, `${esc(t('chart.tilt').toUpperCase())} ${fmt(deg)}°`, 'fl h') + text(px + 52, py - 2, esc(t('chart.sideView').toUpperCase()), 'fl h');
   return svg(py + 26, body);
 }

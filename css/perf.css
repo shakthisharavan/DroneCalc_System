@@ -5,9 +5,9 @@
 .pf-sec{--pf-s:var(--sheet);--pf-mj:color-mix(in srgb,var(--ink) 15%,transparent);--pf-mn:color-mix(in srgb,var(--ink) 6%,transparent);container-type:inline-size}
 /* charts.js and perf.js write PAL hex as fill/stroke attributes and inline --c. These map them to the tone tokens, which equal PAL in light
    and lift in dark (PAL blue is 2.6:1 on the dark sheet; --blue is 5.3:1). CSS beats presentation attributes; !important beats the inline --c. */
-.pf-sec [fill="#1f66ad"]{fill:var(--blue)} .pf-sec [fill="#14907c"]{fill:var(--teal)} .pf-sec [fill="#b07208"]{fill:var(--mustard)}
-.pf-sec [stroke="#1f66ad"]{stroke:var(--blue)} .pf-sec [stroke="#14907c"]{stroke:var(--teal)} .pf-sec [stroke="#b07208"]{stroke:var(--mustard)}
-.pf-sec [style*="#1f66ad"]{--c:var(--blue)!important} .pf-sec [style*="#14907c"]{--c:var(--teal)!important} .pf-sec [style*="#b07208"]{--c:var(--mustard)!important}
+.pf-sec [fill="#1f66ad"]{fill:var(--blue)} .pf-sec [fill="#128472"]{fill:var(--teal)} .pf-sec [fill="#a36907"]{fill:var(--mustard)}
+.pf-sec [stroke="#1f66ad"]{stroke:var(--blue)} .pf-sec [stroke="#128472"]{stroke:var(--teal)} .pf-sec [stroke="#a36907"]{stroke:var(--mustard)}
+.pf-sec [style*="#1f66ad"]{--c:var(--blue)!important} .pf-sec [style*="#128472"]{--c:var(--teal)!important} .pf-sec [style*="#a36907"]{--c:var(--mustard)!important}
 .pf-lede,.pf-note{margin:0 0 18px;max-width:72ch;color:var(--ink-2);font-size:var(--t-body-s,15px)}
 /* columns: masonry-style, cards size to content */
 .pf-grid{column-gap:24px}
